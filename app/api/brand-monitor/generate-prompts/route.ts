@@ -26,13 +26,13 @@ export async function POST(request: NextRequest) {
     // Use the existing generatePromptsForCompany function which creates contextual prompts
     const prompts = await generatePromptsForCompany(company, competitors);
 
-    // Take 10-12 prompts for comprehensive analysis
-    const selectedPrompts = prompts.slice(0, 12).map(p => p.prompt);
+    // Return all 30 prompts for user to choose from (27 simple + 3 advanced)
+    const allPrompts = prompts.map(p => p.prompt);
 
-    console.log(`✅ Generated ${selectedPrompts.length} industry-specific prompts:`, selectedPrompts);
+    console.log(`✅ Generated ${allPrompts.length} industry-specific prompts for selection:`, allPrompts.slice(0, 5));
 
     return NextResponse.json({
-      prompts: selectedPrompts,
+      prompts: allPrompts,
       success: true
     });
 

@@ -8,6 +8,7 @@ import { ProviderSpecificRanking } from '@/lib/types';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import Image from 'next/image';
 import { getConfiguredProviders } from '@/lib/provider-config';
+import { assignUrlToCompetitor } from '@/lib/brand-monitor-utils';
 
 // Provider icon mapping
 const getProviderIcon = (provider: string) => {
@@ -105,18 +106,9 @@ const CompanyCell = ({
   );
 };
 
-// Generate a fallback URL from competitor name
+// Generate a fallback URL from competitor name using smart logic
 const generateFallbackUrl = (competitorName: string): string | undefined => {
-  const cleanName = competitorName.toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, '')
-    .trim();
-  
-  if (cleanName.length < 3 || ['inc', 'llc', 'corp', 'company', 'the'].includes(cleanName)) {
-    return undefined;
-  }
-  
-  return `${cleanName}.com`;
+  return assignUrlToCompetitor(competitorName);
 };
 
 export function ProviderRankingsTabs({ 

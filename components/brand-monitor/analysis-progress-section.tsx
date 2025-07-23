@@ -22,6 +22,7 @@ interface AnalysisProgressSectionProps {
   promptCompletionStatus: PromptCompletionStatus;
   onRemoveDefaultPrompt: (index: number) => void;
   onRemoveCustomPrompt: (prompt: string) => void;
+  onRemovePrompt: (prompt: string) => void;
   onAddPromptClick: () => void;
   onStartAnalysis: () => void;
   detectServiceType: (company: Company) => string;
@@ -82,6 +83,7 @@ export function AnalysisProgressSection({
   promptCompletionStatus,
   onRemoveDefaultPrompt,
   onRemoveCustomPrompt,
+  onRemovePrompt,
   onAddPromptClick,
   onStartAnalysis,
   detectServiceType
@@ -168,28 +170,20 @@ export function AnalysisProgressSection({
                           <p className="text-base font-medium text-gray-900 flex-1">
                             {prompt}
                           </p>
-                          {!analyzing && !isCustom && (
+                          {!analyzing && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // Since we removed defaultPrompts, remove prompt by finding its display index
-                                const displayIndex = displayPrompts.findIndex(p => p === prompt);
-                                if (displayIndex !== -1) {
-                                  onRemoveDefaultPrompt(displayIndex);
+                                if (isCustom) {
+                                  // Remove from custom prompts
+                                  onRemoveCustomPrompt(prompt);
+                                } else {
+                                  // Remove from AI-generated prompts (main prompts list)
+                                  onRemovePrompt(prompt);
                                 }
                               }}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-600" />
-                            </button>
-                          )}
-                          {!analyzing && isCustom && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onRemoveCustomPrompt(prompt);
-                              }}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-50"
+                              className="opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-50 flex-shrink-0"
+                              title="Remove this prompt"
                             >
                               <Trash2 className="w-4 h-4 text-red-600" />
                             </button>

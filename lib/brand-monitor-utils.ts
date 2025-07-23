@@ -72,68 +72,115 @@ export function normalizeCompetitorName(name: string): string {
 }
 
 export function assignUrlToCompetitor(competitorName: string): string | undefined {
-  // Comprehensive URL mapping for common competitors
-  const urlMappings: { [key: string]: string } = {
-    // Web scraping tools
-    'apify': 'apify.com',
-    'scrapy': 'scrapy.org',
-    'octoparse': 'octoparse.com',
-    'parsehub': 'parsehub.com',
-    'diffbot': 'diffbot.com',
-    'import.io': 'import.io',
-    'bright data': 'brightdata.com',
-    'zyte': 'zyte.com',
-    'puppeteer': 'pptr.dev',
-    'playwright': 'playwright.dev',
-    'selenium': 'selenium.dev',
-    'beautiful soup': 'pypi.org/project/beautifulsoup4',
-    'scrapfly': 'scrapfly.io',
-    'crawlbase': 'crawlbase.com',
-    'webharvy': 'webharvy.com',
-    
-    // AI companies
-    'openai': 'openai.com',
-    'anthropic': 'anthropic.com',
-    'google ai': 'ai.google',
-    'microsoft azure': 'azure.microsoft.com',
-    'ibm watson': 'ibm.com/watson',
-    'amazon aws': 'aws.amazon.com',
-    'perplexity': 'perplexity.ai',
-    'claude': 'anthropic.com',
-    'chatgpt': 'openai.com',
-    'gemini': 'gemini.google.com',
-    
-    // SaaS platforms
-    'salesforce': 'salesforce.com',
-    'hubspot': 'hubspot.com',
-    'zendesk': 'zendesk.com',
-    'slack': 'slack.com',
-    'atlassian': 'atlassian.com',
-    'monday.com': 'monday.com',
-    'notion': 'notion.so',
-    'airtable': 'airtable.com',
-    
-    // E-commerce
-    'shopify': 'shopify.com',
-    'woocommerce': 'woocommerce.com',
-    'magento': 'magento.com',
-    'bigcommerce': 'bigcommerce.com',
-    'squarespace': 'squarespace.com',
-    'wix': 'wix.com',
-    
-    // Cloud/hosting
-    'vercel': 'vercel.com',
-    'netlify': 'netlify.com',
-    'aws': 'aws.amazon.com',
-    'google cloud': 'cloud.google.com',
-    'azure': 'azure.microsoft.com',
-    'heroku': 'heroku.com',
-    'digitalocean': 'digitalocean.com',
-    'cloudflare': 'cloudflare.com'
-  };
+  // Pure dynamic URL generation - no hardcoded mappings
+  return generateSmartUrl(competitorName);
+}
+
+function generateSmartUrl(competitorName: string): string | undefined {
+  if (!competitorName || competitorName.trim().length === 0) {
+    return undefined;
+  }
+
+  const originalName = competitorName.trim();
   
-  const normalized = competitorName.toLowerCase().trim();
-  return urlMappings[normalized];
+  // Handle special patterns first
+  if (originalName.toLowerCase().includes('no specific competitors found')) {
+    return undefined;
+  }
+
+  // Clean the name for URL generation
+  let cleanName = originalName.toLowerCase()
+    .replace(/\b(inc|llc|corp|ltd|limited|company|co|group|gmbh|ag|sa|spa|srl|plc|pvt|private|public|bank|bankas)\b/g, '') // Remove common suffixes
+    .replace(/[^a-z0-9\s]/g, '') // Remove special characters
+    .replace(/\s+/g, '') // Remove spaces
+    .trim();
+  
+  // Skip if name is too generic or short
+  if (cleanName.length < 2 || ['the', 'and', 'for', 'with', 'inc', 'llc', 'corp', 'company', 'group', 'bank'].includes(cleanName)) {
+    return undefined;
+  }
+
+  // Handle multi-word company names intelligently
+  if (originalName.includes(' ')) {
+    const words = originalName.toLowerCase().split(/\s+/)
+      .filter(word => word.length > 2)
+      .filter(word => !['inc', 'llc', 'corp', 'ltd', 'limited', 'company', 'co', 'group', 'the', 'and', 'for', 'with'].includes(word));
+    
+    if (words.length >= 2) {
+      // Try combining first two meaningful words
+      const combinedName = words.slice(0, 2).join('').replace(/[^a-z0-9]/g, '');
+      if (combinedName.length >= 4 && combinedName.length <= 20) {
+        cleanName = combinedName;
+      }
+    } else if (words.length === 1 && words[0].length >= 3) {
+      cleanName = words[0].replace(/[^a-z0-9]/g, '');
+    }
+  }
+
+  // Handle very long names by extracting the core brand
+  if (cleanName.length > 20) {
+    const words = originalName.toLowerCase().split(/\s+/);
+    const mainWord = words.find(word => 
+      word.length >= 4 && 
+      word.length <= 12 &&
+      !['the', 'and', 'for', 'with', 'inc', 'llc', 'corp', 'company', 'group', 'ltd', 'limited', 'bank', 'bankas'].includes(word)
+    );
+    if (mainWord) {
+      cleanName = mainWord.replace(/[^a-z0-9]/g, '');
+    } else {
+      // Take first 12 characters if no good word found
+      cleanName = cleanName.substring(0, 12);
+    }
+  }
+
+  if (cleanName.length < 2) {
+    return undefined;
+  }
+
+  // Determine most likely TLD based on company characteristics
+  const lowerOriginal = originalName.toLowerCase();
+  
+  // European financial institutions
+  if (lowerOriginal.includes('bank') || lowerOriginal.includes('bankas')) {
+    if (lowerOriginal.includes('lithuania') || lowerOriginal.includes('lithuanian') || originalName.includes('Lt')) {
+      return `${cleanName}.lt`;
+    }
+    if (lowerOriginal.includes('latvia') || lowerOriginal.includes('latvian')) {
+      return `${cleanName}.lv`;
+    }
+    if (lowerOriginal.includes('estonia') || lowerOriginal.includes('estonian')) {
+      return `${cleanName}.ee`;
+    }
+    if (lowerOriginal.includes('sweden') || lowerOriginal.includes('swedish')) {
+      return `${cleanName}.se`;
+    }
+    // Default for banks
+    return `${cleanName}.com`;
+  }
+
+  // Tech/AI companies
+  if (lowerOriginal.includes('ai') || lowerOriginal.includes('tech') || lowerOriginal.includes('software')) {
+    if (cleanName.length <= 8) {
+      return `${cleanName}.ai`;
+    }
+    return `${cleanName}.com`;
+  }
+
+  // Startups/modern companies might use .io
+  if (cleanName.length <= 8 && (lowerOriginal.includes('io') || 
+      lowerOriginal.includes('app') || 
+      lowerOriginal.includes('platform') ||
+      lowerOriginal.includes('service'))) {
+    return `${cleanName}.io`;
+  }
+
+  // European companies
+  if (lowerOriginal.includes('eu') || lowerOriginal.includes('europe')) {
+    return `${cleanName}.eu`;
+  }
+
+  // Default to .com for most companies
+  return `${cleanName}.com`;
 }
 
 export function detectServiceType(company: Company): string {

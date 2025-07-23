@@ -400,7 +400,7 @@ Example outputs:
   const primaryMarket = location;
   const isGlobal = location === 'Global' || location === 'United States' || markets.some(m => m === 'Global');
   
-  const aiPromptRequest = `You are an expert at creating search queries that real people would use. Generate 15 analysis prompts for ${company.industry} companies: 10 SIMPLE popular searches + 5 ADVANCED analysis prompts.
+  const aiPromptRequest = `You are an expert at creating search queries that real people would use. Generate 30 analysis prompts for ${company.industry} companies: 27 SIMPLE popular searches + 3 ADVANCED analysis prompts.
 
 Company Profile:
 - Name: ${company.name}
@@ -425,18 +425,20 @@ ${isGlobal ?
 }
 
 REQUIREMENTS:
-Generate EXACTLY 15 prompts in this structure:
+Generate EXACTLY 30 prompts in this structure:
 
-**10 SIMPLE PROMPTS (what people actually search for):**
+**27 SIMPLE PROMPTS (what people actually search for):**
 - Use simple, common language that real people search on Google
-- Focus on "best", "top", "most trusted", "cheapest", "fastest", etc.
+- Focus on "best", "top", "most trusted", "cheapest", "fastest", "affordable", "reliable", etc.
 - Make them market-specific to PRIMARY MARKET: ${primaryMarket}
-- Examples: "best business credit companies${isGlobal ? ' globally' : ' in ' + primaryMarket}", "most trusted ${company.industry} providers"
+- Include variety: price-focused, quality-focused, speed-focused, trust-focused, feature-focused
+- Examples: "best business credit companies${isGlobal ? ' globally' : ' in ' + primaryMarket}", "most trusted ${company.industry} providers", "cheapest ${company.industry} options"
 
-**5 ADVANCED PROMPTS (detailed analysis):**
+**3 ADVANCED PROMPTS (detailed analysis):**
 - More sophisticated comparative analysis  
-- Focus on specific business factors, innovation, market positioning
+- Focus on specific business factors, innovation, market positioning, strategic advantages
 - Still no company names mentioned
+- Examples: "Which ${company.industry} providers offer the most innovative solutions?", "How do leading companies differentiate their services?"
 
 DO NOT mention specific company names in any prompts - use generic terms.
 
@@ -444,19 +446,25 @@ Examples for ${company.industry}:
 SIMPLE: "best ${company.industry} companies${isGlobal ? ' worldwide' : ' in ' + primaryMarket}"
 SIMPLE: "most trusted ${company.industry} providers${isGlobal ? '' : ' in ' + primaryMarket}" 
 SIMPLE: "cheapest ${company.industry} options"
-ADVANCED: "Which ${company.industry} providers offer the most innovative solutions for enterprise clients?"
+SIMPLE: "fastest ${company.industry} services"
+SIMPLE: "most reliable ${company.industry} companies"
+SIMPLE: "affordable ${company.industry} solutions"
+ADVANCED: "Which ${company.industry} providers demonstrate the strongest competitive advantages in emerging market segments?"
+ADVANCED: "How do leading ${company.industry} companies differentiate their value proposition?"
+ADVANCED: "What are the key innovation trends among top ${company.industry} providers?"
 
 Return ONLY a JSON array with this exact format:
 [
   {"prompt": "best ${company.industry} companies${isGlobal ? ' worldwide' : ' in ' + primaryMarket}", "category": "simple"},
   {"prompt": "most trusted ${company.industry} providers", "category": "simple"},
   {"prompt": "top rated ${company.industry} companies", "category": "simple"},
-  ...10 simple prompts...
+  ...27 simple prompts total...
   {"prompt": "Which ${company.industry} providers demonstrate the strongest competitive advantages in emerging market segments?", "category": "advanced"},
-  ...5 advanced prompts...
+  {"prompt": "How do leading ${company.industry} companies differentiate their value proposition?", "category": "advanced"},
+  {"prompt": "What are the key innovation trends among top ${company.industry} providers?", "category": "advanced"}
 ]
 
-Generate exactly 15 prompts: 10 simple + 5 advanced.`;
+Generate exactly 30 prompts: 27 simple + 3 advanced.`;
 
   console.log('🤖 Sending AI request for dynamic prompt generation...');
 
@@ -489,7 +497,7 @@ Generate exactly 15 prompts: 10 simple + 5 advanced.`;
     // Validate and convert to BrandPrompt format
     const prompts: BrandPrompt[] = aiGeneratedPrompts
       .filter((p: any) => p.prompt && typeof p.prompt === 'string')
-      .slice(0, 15) // Ensure max 15 prompts
+      .slice(0, 30) // Ensure max 30 prompts
       .map((p: any, index: number) => ({
         id: (index + 1).toString(),
         prompt: p.prompt,
@@ -497,7 +505,7 @@ Generate exactly 15 prompts: 10 simple + 5 advanced.`;
       }));
 
     console.log(`✅ Successfully generated ${prompts.length} AI-powered prompts for ${company.name}`);
-    console.log('📝 Sample prompts:', prompts.slice(0, 3).map(p => p.prompt));
+    console.log('📝 Sample prompts:', prompts.slice(0, 5).map(p => p.prompt));
 
     return prompts;
 

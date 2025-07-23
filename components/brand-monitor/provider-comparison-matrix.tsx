@@ -5,6 +5,7 @@ import { ProviderComparisonData } from '@/lib/types';
 import { ArrowUpDownIcon, ArrowUpIcon, ArrowDownIcon } from 'lucide-react';
 import { CompetitorCell } from './competitor-cell';
 import { getConfiguredProviders } from '@/lib/provider-config';
+import { assignUrlToCompetitor } from '@/lib/brand-monitor-utils';
 
 interface ProviderComparisonMatrixProps {
   data: ProviderComparisonData[];
@@ -63,30 +64,10 @@ const getProviderIcon = (provider: string) => {
   }
 };
 
-// Generate a fallback URL from competitor name
+  // Generate a fallback URL from competitor name using smart logic
 const generateFallbackUrl = (competitorName: string): string | undefined => {
-  // Clean the name for URL generation
-  const cleanName = competitorName.toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '') // Remove special characters
-    .replace(/\s+/g, '') // Remove spaces
-    .trim();
-  
-  // Skip if name is too generic or short
-  if (cleanName.length < 3 || ['inc', 'llc', 'corp', 'company', 'the'].includes(cleanName)) {
-    return undefined;
-  }
-  
-  // Try common domain patterns
-  const possibleDomains = [
-    `${cleanName}.com`,
-    `${cleanName}.io`,
-    `${cleanName}.ai`,
-    `get${cleanName}.com`,
-    `www.${cleanName}.com`
-  ];
-  
-  // Return the most likely domain (usually .com)
-  return possibleDomains[0];
+  // Use the improved URL assignment logic
+  return assignUrlToCompetitor(competitorName);
 };
 
 export function ProviderComparisonMatrix({ data, brandName, competitors }: ProviderComparisonMatrixProps) {

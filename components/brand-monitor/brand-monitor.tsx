@@ -318,44 +318,47 @@ export function BrandMonitor({
   }, [company]);
   
   const handleProceedToPrompts = useCallback(async () => {
+    // Generate AI prompts FIRST, before navigation
+    if (company && analyzingPrompts.length === 0) {
+      console.log('🎯 Generating AI prompts BEFORE showing prompts screen...');
+      
+      try {
+        const response = await fetch('/api/brand-monitor/generate-prompts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            company,
+            competitors: identifiedCompetitors.map(c => c.name)
+          })
+        });
+        
+        const responseData = await response.json();
+        
+        if (response.ok && responseData.success && responseData.prompts) {
+          console.log(`✅ Pre-generated ${responseData.prompts.length} prompts BEFORE navigation`);
+          dispatch({ type: 'SET_ANALYZING_PROMPTS', payload: responseData.prompts });
+        } else {
+          console.error('❌ Failed to pre-generate prompts:', responseData.details || responseData.error);
+          dispatch({ type: 'SET_ERROR', payload: `Failed to generate analysis prompts: ${responseData.details || responseData.error}. Please try refreshing or contact support.` });
+          return; // Don't proceed if prompt generation failed
+        }
+      } catch (error) {
+        console.error('❌ Network error pre-generating prompts:', error);
+        dispatch({ type: 'SET_ERROR', payload: 'Failed to connect to AI services for prompt generation. Please check your internet connection and try again.' });
+        return; // Don't proceed if prompt generation failed
+      }
+    }
+    
+    // THEN navigate to prompts screen (prompts are already generated)
     // Add a fade-out class to the current view
     const currentView = document.querySelector('.animate-panel-in');
     if (currentView) {
       currentView.classList.add('opacity-0');
     }
     
-    setTimeout(async () => {
+    setTimeout(() => {
       dispatch({ type: 'SET_SHOW_COMPETITORS', payload: false });
       dispatch({ type: 'SET_SHOW_PROMPTS_LIST', payload: true });
-      
-      // Immediately generate AI prompts so users can see them
-      if (company && analyzingPrompts.length === 0) {
-        console.log('🎯 Generating AI prompts for display...');
-        
-        try {
-          const response = await fetch('/api/brand-monitor/generate-prompts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              company,
-              competitors: identifiedCompetitors.map(c => c.name)
-            })
-          });
-          
-          const responseData = await response.json();
-          
-          if (response.ok && responseData.success && responseData.prompts) {
-            console.log(`✅ Pre-generated ${responseData.prompts.length} prompts for display`);
-            dispatch({ type: 'SET_ANALYZING_PROMPTS', payload: responseData.prompts });
-          } else {
-            console.error('❌ Failed to pre-generate prompts:', responseData.details || responseData.error);
-            dispatch({ type: 'SET_ERROR', payload: `Failed to generate analysis prompts: ${responseData.details || responseData.error}. Please try refreshing or contact support.` });
-          }
-        } catch (error) {
-          console.error('❌ Network error pre-generating prompts:', error);
-          dispatch({ type: 'SET_ERROR', payload: 'Failed to connect to AI services for prompt generation. Please check your internet connection and try again.' });
-        }
-      }
     }, 300);
   }, [company, identifiedCompetitors, analyzingPrompts.length]);
   
@@ -533,6 +536,9 @@ export function BrandMonitor({
           onRemoveDefaultPrompt={(index) => dispatch({ type: 'REMOVE_DEFAULT_PROMPT', payload: index })}
           onRemoveCustomPrompt={(prompt) => {
             dispatch({ type: 'SET_CUSTOM_PROMPTS', payload: customPrompts.filter(p => p !== prompt) });
+          }}
+          onRemovePrompt={(prompt) => {
+            dispatch({ type: 'SET_ANALYZING_PROMPTS', payload: analyzingPrompts.filter(p => p !== prompt) });
           }}
           onAddPromptClick={() => {
             dispatch({ type: 'TOGGLE_MODAL', payload: { modal: 'addPrompt', show: true } });
