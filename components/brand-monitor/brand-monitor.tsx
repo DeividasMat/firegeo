@@ -4,7 +4,7 @@ import React, { useReducer, useCallback, useState, useEffect, useRef } from 'rea
 import { Company } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles } from 'lucide-react';
-import { CREDITS_PER_BRAND_ANALYSIS } from '@/config/constants';
+
 import { ClientApiError } from '@/lib/client-errors';
 import { 
   brandMonitorReducer, 
@@ -40,15 +40,11 @@ import { ProviderRankingsTabs } from './provider-rankings-tabs';
 import { useSSEHandler } from './hooks/use-sse-handler';
 
 interface BrandMonitorProps {
-  creditsAvailable?: number;
-  onCreditsUpdate?: () => void;
   selectedAnalysis?: any;
   onSaveAnalysis?: (analysis: any) => void;
 }
 
 export function BrandMonitor({ 
-  creditsAvailable = 0, 
-  onCreditsUpdate,
   selectedAnalysis,
   onSaveAnalysis 
 }: BrandMonitorProps = {}) {
@@ -60,8 +56,7 @@ export function BrandMonitor({
   
   const { startSSEConnection } = useSSEHandler({ 
     state, 
-    dispatch, 
-    onCreditsUpdate,
+    dispatch,
     onAnalysisComplete: (completedAnalysis) => {
       // Only save if this is a new analysis (not loaded from existing)
       if (!selectedAnalysis && !hasSavedRef.current) {
@@ -74,7 +69,7 @@ export function BrandMonitor({
           analysisData: completedAnalysis,
           competitors: identifiedCompetitors,
           prompts: analyzingPrompts,
-          creditsUsed: CREDITS_PER_BRAND_ANALYSIS
+          creditsUsed: 0
         };
         
         saveAnalysis.mutate(analysisData, {
@@ -180,11 +175,7 @@ export function BrandMonitor({
       return;
     }
 
-    // Check if user has enough credits for initial scrape (1 credit)
-    if (creditsAvailable < 1) {
-      dispatch({ type: 'SET_ERROR', payload: 'Insufficient credits. You need at least 1 credit to analyze a URL.' });
-      return;
-    }
+    // No credit checks needed - completely free platform
 
     console.log('Starting scrape for URL:', url);
     dispatch({ type: 'SET_LOADING', payload: true });
@@ -224,10 +215,7 @@ export function BrandMonitor({
         throw new Error('No company data received');
       }
       
-      // Scrape was successful - credits have been deducted, refresh the navbar
-      if (onCreditsUpdate) {
-        onCreditsUpdate();
-      }
+      // Scrape was successful - no credit system needed
       
       // Start fade out transition
       dispatch({ type: 'SET_SHOW_INPUT', payload: false });
@@ -253,7 +241,7 @@ export function BrandMonitor({
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, [url, creditsAvailable, onCreditsUpdate]);
+  }, [url]);
   
   const handlePrepareAnalysis = useCallback(async () => {
     if (!company) return;
@@ -277,47 +265,49 @@ export function BrandMonitor({
       dispatch({ type: 'SET_AVAILABLE_PROVIDERS', payload: defaultProviders.length > 0 ? defaultProviders : ['OpenAI', 'Anthropic'] });
     }
     
-    // Extract competitors from scraped data or use industry defaults
-    const extractedCompetitors = company.scrapedData?.competitors || [];
-    const industryCompetitors = getIndustryCompetitors(company.industry || '');
+    // Use AI to discover real competitors dynamically
+    let competitors: IdentifiedCompetitor[] = [];
     
-    // Merge extracted competitors with industry defaults, keeping URLs where available
-    const competitorMap = new Map<string, IdentifiedCompetitor>();
-    
-    // Add industry competitors first (they have URLs)
-    industryCompetitors.forEach(comp => {
-      const normalizedName = normalizeCompetitorName(comp.name);
-      competitorMap.set(normalizedName, comp as IdentifiedCompetitor);
-    });
-    
-    // Add extracted competitors and try to match them with known URLs
-    extractedCompetitors.forEach(name => {
-      const normalizedName = normalizeCompetitorName(name);
+    try {
+      console.log('🤖 Using AI to discover competitors for:', company.name);
       
-      // Check if we already have this competitor
-      const existing = competitorMap.get(normalizedName);
-      if (existing) {
-        // If existing has URL but current doesn't, keep existing
-        if (!existing.url) {
-          const url = assignUrlToCompetitor(name);
-          competitorMap.set(normalizedName, { name, url });
-        }
-        return;
+      // Use basic AI competitor discovery (no enhanced system to avoid type errors)
+      const response = await fetch('/api/brand-monitor/basic-competitors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ AI discovered competitors:', data.competitors);
+        
+                 // Convert AI-discovered competitors to the expected format (allow more competitors)
+         competitors = data.competitors.slice(0, 12).map((name: string) => ({
+           name,
+           url: assignUrlToCompetitor(name)
+         }));
+      } else {
+        console.warn('AI competitor discovery failed, using scraped data');
+        throw new Error('AI discovery failed');
       }
+    } catch (error) {
+      console.error('Error with AI competitor discovery:', error);
       
-      // New competitor - try to find a URL for it
-      const url = assignUrlToCompetitor(name);
-      competitorMap.set(normalizedName, { name, url });
-    });
-    
-    let competitors = Array.from(competitorMap.values())
-      .filter(comp => comp.name !== 'Competitor 1' && comp.name !== 'Competitor 2' && 
-                      comp.name !== 'Competitor 3' && comp.name !== 'Competitor 4' && 
-                      comp.name !== 'Competitor 5')
-      .slice(0, 10);
-
-    // Just use the first 6 competitors without AI validation
-    competitors = competitors.slice(0, 6);
+             // Fallback: Use only scraped competitors (no hardcoded industry defaults)  
+       const extractedCompetitors = company.scrapedData?.competitors || [];
+       if (extractedCompetitors.length > 0) {
+         competitors = extractedCompetitors.slice(0, 10).map(name => ({
+           name,
+           url: assignUrlToCompetitor(name)
+         }));
+      } else {
+        // Last resort: Show that no competitors were found
+        competitors = [
+          { name: `No specific competitors found for ${company.name}`, url: undefined }
+        ];
+      }
+    }
     
     console.log('Identified competitors:', competitors);
     dispatch({ type: 'SET_IDENTIFIED_COMPETITORS', payload: competitors });
@@ -327,18 +317,47 @@ export function BrandMonitor({
     dispatch({ type: 'SET_PREPARING_ANALYSIS', payload: false });
   }, [company]);
   
-  const handleProceedToPrompts = useCallback(() => {
+  const handleProceedToPrompts = useCallback(async () => {
     // Add a fade-out class to the current view
     const currentView = document.querySelector('.animate-panel-in');
     if (currentView) {
       currentView.classList.add('opacity-0');
     }
     
-    setTimeout(() => {
+    setTimeout(async () => {
       dispatch({ type: 'SET_SHOW_COMPETITORS', payload: false });
       dispatch({ type: 'SET_SHOW_PROMPTS_LIST', payload: true });
+      
+      // Immediately generate AI prompts so users can see them
+      if (company && analyzingPrompts.length === 0) {
+        console.log('🎯 Generating AI prompts for display...');
+        
+        try {
+          const response = await fetch('/api/brand-monitor/generate-prompts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              company,
+              competitors: identifiedCompetitors.map(c => c.name)
+            })
+          });
+          
+          const responseData = await response.json();
+          
+          if (response.ok && responseData.success && responseData.prompts) {
+            console.log(`✅ Pre-generated ${responseData.prompts.length} prompts for display`);
+            dispatch({ type: 'SET_ANALYZING_PROMPTS', payload: responseData.prompts });
+          } else {
+            console.error('❌ Failed to pre-generate prompts:', responseData.details || responseData.error);
+            dispatch({ type: 'SET_ERROR', payload: `Failed to generate analysis prompts: ${responseData.details || responseData.error}. Please try refreshing or contact support.` });
+          }
+        } catch (error) {
+          console.error('❌ Network error pre-generating prompts:', error);
+          dispatch({ type: 'SET_ERROR', payload: 'Failed to connect to AI services for prompt generation. Please check your internet connection and try again.' });
+        }
+      }
     }, 300);
-  }, []);
+  }, [company, identifiedCompetitors, analyzingPrompts.length]);
   
   const handleAnalyze = useCallback(async () => {
     if (!company) return;
@@ -346,28 +365,46 @@ export function BrandMonitor({
     // Reset saved flag for new analysis
     hasSavedRef.current = false;
 
-    // Check if user has enough credits
-    if (creditsAvailable < CREDITS_PER_BRAND_ANALYSIS) {
-      dispatch({ type: 'SET_ERROR', payload: `Insufficient credits. You need at least ${CREDITS_PER_BRAND_ANALYSIS} credits to run an analysis.` });
-      return;
-    }
+    // No credit checks needed - completely free platform
 
-    // Immediately trigger credit update to reflect deduction in navbar
-    if (onCreditsUpdate) {
-      onCreditsUpdate();
-    }
-
-    // Collect all prompts (default + custom)
-    const serviceType = detectServiceType(company);
-    const currentYear = new Date().getFullYear();
-    const defaultPrompts = [
-      `Best ${serviceType}s in ${currentYear}?`,
-      `Top ${serviceType}s for startups?`,
-      `Most popular ${serviceType}s today?`,
-      `Recommended ${serviceType}s for developers?`
-    ].filter((_, index) => !removedDefaultPrompts.includes(index));
+    // Use pre-generated prompts or generate them if not available
+    let allPrompts = [...customPrompts]; // Start with custom prompts
     
-    const allPrompts = [...defaultPrompts, ...customPrompts];
+    if (analyzingPrompts.length > 0) {
+      // Use pre-generated prompts from the prompts screen
+      console.log(`✅ Using ${analyzingPrompts.length} pre-generated AI prompts`);
+      allPrompts = [...analyzingPrompts, ...customPrompts];
+    } else {
+      // Fallback: generate prompts now if they weren't pre-generated
+      console.log('🎯 Generating AI prompts during analysis (fallback)...');
+      
+      try {
+        const response = await fetch('/api/brand-monitor/generate-prompts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            company,
+            competitors: identifiedCompetitors.map(c => c.name)
+          })
+        });
+        
+        const responseData = await response.json();
+        
+        if (response.ok && responseData.success && responseData.prompts) {
+          console.log(`✅ Fallback generated ${responseData.prompts.length} prompts`);
+          allPrompts = [...responseData.prompts, ...customPrompts];
+        } else {
+          const errorMessage = responseData.details || responseData.error || 'Unknown error';
+          console.error('❌ AI prompt generation failed:', errorMessage);
+          dispatch({ type: 'SET_ERROR', payload: `AI prompt generation failed: ${errorMessage}. Please try again or contact support.` });
+          return;
+        }
+      } catch (error) {
+        console.error('❌ Network error during AI prompt generation:', error);
+        dispatch({ type: 'SET_ERROR', payload: 'Failed to connect to AI services. Please check your internet connection and try again.' });
+        return;
+      }
+    }
     
     // Store the prompts for UI display - make sure they're normalized
     const normalizedPrompts = allPrompts.map(p => p.trim());
@@ -411,7 +448,7 @@ export function BrandMonitor({
     } finally {
       dispatch({ type: 'SET_ANALYZING', payload: false });
     }
-  }, [company, removedDefaultPrompts, customPrompts, identifiedCompetitors, startSSEConnection, creditsAvailable]);
+  }, [company, removedDefaultPrompts, customPrompts, identifiedCompetitors, startSSEConnection]);
   
   const handleRestart = useCallback(() => {
     dispatch({ type: 'RESET_STATE' });

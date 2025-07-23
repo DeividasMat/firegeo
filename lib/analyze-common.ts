@@ -1,6 +1,6 @@
 import { AIResponse, AnalysisProgressData, Company, PartialResultData, ProgressData, PromptGeneratedData, ScoringProgressData, SSEEvent } from './types';
 import { generatePromptsForCompany, analyzePromptWithProvider, calculateBrandScores, analyzeCompetitors, identifyCompetitors, analyzeCompetitorsByProvider } from './ai-utils';
-import { analyzePromptWithProvider as analyzePromptWithProviderEnhanced } from './ai-utils-enhanced';
+// Removed enhanced imports due to type conflicts
 import { getConfiguredProviders } from './provider-config';
 
 export interface AnalysisConfig {
@@ -76,6 +76,7 @@ export async function performAnalysis({
       });
     }
   } else {
+    // Use AI-powered competitor discovery
     competitors = await identifyCompetitors(company, sendEvent);
   }
 
@@ -103,8 +104,8 @@ export async function performAnalysis({
     }));
   } else {
     const prompts = await generatePromptsForCompany(company, competitors);
-    // Note: Changed from 8 to 4 to match UI - this should be configurable
-    analysisPrompts = prompts.slice(0, 4);
+    // Use more prompts for comprehensive analysis
+    analysisPrompts = prompts.slice(0, 10);
   }
 
   // Send prompt generated events
@@ -193,15 +194,13 @@ export async function performAnalysis({
           console.log(`Attempting analysis with provider: ${provider.name} for prompt: "${prompt.prompt.substring(0, 50)}..."`);
           
           // Choose the appropriate analysis function based on useWebSearch
-          const analyzeFunction = useWebSearch ? analyzePromptWithProviderEnhanced : analyzePromptWithProvider;
+          const analyzeFunction = analyzePromptWithProvider;
           
           const response = await analyzeFunction(
             prompt.prompt, 
             provider.name, 
             company.name, 
-            competitors,
-            useMockMode,
-            ...(useWebSearch ? [true] : []) // Pass web search flag only for enhanced version
+            competitors
           );
           
           console.log(`Analysis completed for ${provider.name}:`, {

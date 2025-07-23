@@ -160,7 +160,7 @@ async function main() {
     
     // Install dependencies
     process.stdout.write('Installing dependencies... ');
-    await exec('npm', ['install', '--quiet']);
+    await exec('pnpm', ['install', '--silent']);
     console.log('✓');
     
     // Database setup
@@ -189,7 +189,7 @@ async function main() {
     // Drizzle push
     process.stdout.write('Syncing database schema... ');
     try {
-      await exec('npm', ['run', 'db:push']);
+      await exec('pnpm', ['run', 'db:push']);
       console.log('✓');
     } catch {
       console.log('✓');
@@ -201,7 +201,7 @@ async function main() {
     // Autumn
     process.stdout.write('Autumn billing: ');
     try {
-      const output = await exec('npm', ['run', 'setup:autumn']);
+      const output = await exec('pnpm', ['run', 'setup:autumn']);
       if (output.includes('[OK]')) {
         console.log('✓ Configured');
       } else if (output.includes('not configured')) {
@@ -216,7 +216,7 @@ async function main() {
     // Stripe Portal
     process.stdout.write('Stripe portal: ');
     try {
-      const output = await exec('npm', ['run', 'setup:stripe-portal']);
+      const output = await exec('pnpm', ['run', 'setup:stripe-portal']);
       if (output.includes('[OK]')) {
         console.log('✓ Configured');
       } else {
@@ -228,9 +228,9 @@ async function main() {
     
     // Success
     console.log('\n✅ Setup complete!\n');
-    console.log('  npm run dev       → Start development');
-    console.log('  npm run db:studio → Database UI');
-    console.log('  npm run build     → Production build\n');
+    console.log('  pnpm run dev       → Start development');
+    console.log('  pnpm run db:studio → Database UI');
+    console.log('  pnpm run build     → Production build\n');
     
   } catch (error) {
     log.error(`Setup failed: ${error.message}`);

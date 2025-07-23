@@ -391,26 +391,8 @@ function DashboardContent({ session }: { session: any }) {
 }
 
 export default function DashboardPage() {
-  const { data: session, isPending } = useSession();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!isPending && !session) {
-      router.push('/login');
-    }
-  }, [session, isPending, router]);
-
-  if (isPending || !session) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Only render DashboardContent when we have a session and AutumnProvider is available
-  return <DashboardContent session={session} />;
+  // No authentication required - completely public access
+  const mockSession = { user: { id: 'public-user', email: 'public@access.com', name: 'Public User' } };
+  
+  return <DashboardContent session={mockSession} />;
 }

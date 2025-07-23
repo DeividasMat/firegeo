@@ -27,25 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has enough credits (1 credit for URL scraping)
-    try {
-      const access = await autumn.check({
-        customer_id: sessionResponse.user.id,
-        feature_id: FEATURE_ID_MESSAGES,
-      });
-      
-      if (!access.data?.allowed || (access.data?.balance && access.data.balance < 1)) {
-        throw new InsufficientCreditsError(
-          'Insufficient credits. You need at least 1 credit to analyze a URL.',
-          { required: 1, available: access.data?.balance || 0 }
-        );
-      }
-    } catch (error) {
-      if (error instanceof InsufficientCreditsError) {
-        throw error;
-      }
-      console.error('[Brand Monitor Scrape] Credit check error:', error);
-      throw new ExternalServiceError('Unable to verify credits. Please try again', 'autumn');
-    }
+    // No credit checks needed - completely free platform
 
     const { url, maxAge } = await request.json();
 

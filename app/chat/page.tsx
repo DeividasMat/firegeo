@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
-import { useCustomer } from '@/hooks/useAutumnCustomer';
+
 import { Button } from '@/components/ui/button';
 import { Send, Menu, X, MessageSquare, Plus, Trash2 } from 'lucide-react';
 import { useConversations, useConversation, useDeleteConversation } from '@/hooks/useConversations';
@@ -14,7 +14,7 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 // Separate component that uses Autumn hooks
 function ChatContent({ session }: { session: any }) {
   const router = useRouter();
-  const { allowed, customer, refetch } = useCustomer();
+  // No billing system needed - completely free platform
   const [input, setInput] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -284,25 +284,8 @@ function ChatContent({ session }: { session: any }) {
 }
 
 export default function ChatPage() {
-  const { data: session, isPending } = useSession();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!isPending && !session) {
-      router.push('/login');
-    }
-  }, [session, isPending, router]);
-
-  if (isPending || !session) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return <ChatContent session={session} />;
+  // No authentication required - completely public access
+  const mockSession = { user: { id: 'public-user', email: 'public@access.com', name: 'Public User' } };
+  
+  return <ChatContent session={mockSession} />;
 }

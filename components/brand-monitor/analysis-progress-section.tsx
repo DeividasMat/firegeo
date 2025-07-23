@@ -86,18 +86,8 @@ export function AnalysisProgressSection({
   onStartAnalysis,
   detectServiceType
 }: AnalysisProgressSectionProps) {
-  // Generate default prompts
-  const serviceType = detectServiceType(company);
-  const currentYear = new Date().getFullYear();
-  const defaultPrompts = [
-    `Best ${serviceType}s in ${currentYear}?`,
-    `Top ${serviceType}s for startups?`,
-    `Most popular ${serviceType}s today?`,
-    `Recommended ${serviceType}s for developers?`
-  ].filter((_, index) => !removedDefaultPrompts.includes(index));
-  
-  // Use provided prompts or generate from defaults + custom
-  const displayPrompts = prompts.length > 0 ? prompts : [...defaultPrompts, ...customPrompts];
+  // Use AI-generated prompts only - no hardcoded fallbacks
+  const displayPrompts = prompts.length > 0 ? prompts : customPrompts;
   
   return (
     <div className="flex items-center justify-center animate-panel-in">
@@ -182,9 +172,10 @@ export function AnalysisProgressSection({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const originalIndex = defaultPrompts.findIndex(p => p === prompt);
-                                if (originalIndex !== -1) {
-                                  onRemoveDefaultPrompt(originalIndex);
+                                // Since we removed defaultPrompts, remove prompt by finding its display index
+                                const displayIndex = displayPrompts.findIndex(p => p === prompt);
+                                if (displayIndex !== -1) {
+                                  onRemoveDefaultPrompt(displayIndex);
                                 }
                               }}
                               className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-50"

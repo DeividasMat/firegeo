@@ -25,24 +25,19 @@ export default function Home() {
               </span>
             </h1>
             <p className="text-xl lg:text-2xl text-zinc-600 max-w-3xl mx-auto mb-6 animate-fade-in-up animation-delay-200">
-              Track how AI models rank your brand against competitors
+              Track how AI models rank your brand against competitors - <span className="text-green-600 font-semibold">Completely FREE!</span>
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up animation-delay-400">
               <Link
                 href="/brand-monitor"
-                className="btn-firecrawl-orange inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] text-base font-medium transition-all duration-200 h-12 px-8"
+                className="btn-firecrawl-orange inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] text-base font-medium transition-all duration-200 h-12 px-8 shadow-lg hover:shadow-xl transform hover:scale-105"
               >
-                Start Brand Analysis
+                🚀 Start FREE Analysis Now
               </Link>
-              <Link
-                href="/plans"
-                className="btn-firecrawl-default inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] text-base font-medium transition-all duration-200 h-12 px-8"
-              >
-                View Pricing
-              </Link>
+
             </div>
             <p className="mt-6 text-sm text-zinc-500 animate-fade-in-up animation-delay-600">
-              Powered by AI • Real-time Analysis • Competitor Tracking • SEO Insights
+              🚀 No Registration Required • 💯 Completely Free • 🤖 AI-Powered • ⚡ Start Instantly
             </p>
           </div>
 
@@ -195,11 +190,7 @@ export default function Home() {
             </div>
             </div>
 
-            <div className="text-center mt-12">
-              <Link href="/plans" className="text-orange-600 hover:text-orange-700 font-medium">
-                View detailed pricing →
-              </Link>
-            </div>
+
           </div>
         </div>
       </section>
@@ -217,9 +208,9 @@ export default function Home() {
             </p>
             <Link
               href="/brand-monitor"
-              className="btn-firecrawl-default inline-flex items-center justify-center whitespace-nowrap rounded-[10px] text-base font-medium transition-all duration-200 h-12 px-8"
+              className="btn-firecrawl-default inline-flex items-center justify-center whitespace-nowrap rounded-[10px] text-base font-medium transition-all duration-200 h-12 px-8 hover:scale-105"
             >
-              Start Free Analysis
+              ✨ Try It Now - FREE
             </Link>
           </div>
         </div>
@@ -389,16 +380,11 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               href="/brand-monitor"
-              className="btn-firecrawl-orange inline-flex items-center justify-center whitespace-nowrap rounded-[10px] text-base font-medium transition-all duration-200 h-12 px-8"
+              className="btn-firecrawl-orange inline-flex items-center justify-center whitespace-nowrap rounded-[10px] text-base font-medium transition-all duration-200 h-12 px-8 hover:scale-105"
             >
-              Analyze Your Brand
+              🎯 Start FREE Analysis
             </Link>
-            <Link
-              href="/plans"
-              className="inline-flex items-center justify-center whitespace-nowrap rounded-[10px] text-base font-medium transition-all duration-200 h-12 px-8 bg-zinc-800 text-white hover:bg-zinc-700"
-            >
-              View Pricing
-            </Link>
+
           </div>
         </div>
       </section>

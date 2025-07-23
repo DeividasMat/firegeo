@@ -54,6 +54,9 @@ export async function scrapeCompanyInfo(url: string, maxAge?: number): Promise<C
       throw new Error(`${provider.name} model not available`);
     }
     
+    console.log('🔍 Scraping URL:', normalizedUrl);
+    console.log('📄 Content preview:', html?.substring(0, 300) + '...');
+    
     const { object } = await generateObject({
       model,
       schema: CompanyInfoSchema,
@@ -64,23 +67,42 @@ export async function scrapeCompanyInfo(url: string, maxAge?: number): Promise<C
       
       Extract the company name, a brief description, relevant keywords, and identify the PRIMARY industry category. 
       
-      Industry detection rules:
+      Industry detection rules (PRIORITY ORDER - check from top to bottom):
+      
+      *** MOST IMPORTANT: EDUCATION FIRST ***
+      - If the company name contains "university", "universitetas", "college", "school", "academy", or any educational terms, categorize as "education"
+      - If the content mentions degrees, courses, students, education, academic programs, MBA, bachelor, master, PhD, categorize as "education"
+      - If it offers educational services, training programs, certifications, or learning, categorize as "education"
+      - Business schools, law schools, medical schools are ALL "education" - NOT business/legal/medical industries
+      
+      ONLY after ruling out education:
+      - If the company offers loans, lending, financing, credit, banking, financial services, investment, insurance, or payment processing, categorize as "financial services"
+      - If the company is a hospital, clinic, or healthcare provider, categorize as "healthcare"
       - If the company makes coolers, drinkware, outdoor equipment, camping gear, categorize as "outdoor gear"
       - If the company offers web scraping, crawling, data extraction, or HTML parsing tools/services, categorize as "web scraping"
-      - If the company primarily provides AI/ML models or services, categorize as "AI"
+      - If the company primarily provides AI/ML models or services (but NOT educational AI), categorize as "AI"
       - If the company offers hosting, deployment, or cloud infrastructure, categorize as "deployment"
       - If the company is an e-commerce platform or online store builder, categorize as "e-commerce platform"
       - If the company sells physical products directly to consumers (clothing, accessories, etc.), categorize as "direct-to-consumer brand"
       - If the company is in fashion/apparel/underwear/clothing, categorize as "apparel & fashion"
-      - If the company provides software tools or APIs, categorize as "developer tools"
+      - If the company provides software tools or APIs (but NOT for education), categorize as "developer tools"
       - If the company is a marketplace or aggregator, categorize as "marketplace"
-      - For other B2B software, use "SaaS"
+      - For other B2B software (but NOT educational software), use "SaaS"
       - For other consumer products, use "consumer goods"
+      
+      CRITICAL: Always check for educational keywords FIRST before any other classification!
       
       IMPORTANT: 
       1. For mainProducts, list the ACTUAL PRODUCTS (e.g., "coolers", "tumblers", "drinkware") not product categories
       2. For competitors, extract FULL COMPANY NAMES (e.g., "RTIC", "IGLOO", "Coleman") not just initials
       3. Focus on what the company MAKES/SELLS, not what goes IN their products (e.g., Yeti makes coolers, not beverages)`,
+    });
+
+    console.log('🎯 AI Scraper Result:', {
+      name: object.name,
+      industry: object.industry,
+      keywords: object.keywords.slice(0, 5),
+      mainProducts: object.mainProducts
     });
 
     // Extract favicon URL - try multiple sources

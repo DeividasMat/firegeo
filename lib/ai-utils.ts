@@ -47,31 +47,118 @@ export async function identifyCompetitors(company: Company, progressCallback?: P
       throw new Error(`${provider.name} model not available`);
     }
     
-    const prompt = `Identify 6-9 real, established competitors of ${company.name} in the ${company.industry || 'technology'} industry.
+    // Use AI to detect actual market presence for competitor discovery
+    let location = 'Unknown';
+    let markets: string[] = [];
+    
+    try {
+      console.log('🌍 Analyzing company market presence for competitor discovery...');
+      
+      const description = company.scrapedData?.description || company.description || '';
+      const keywords = company.scrapedData?.keywords || [];
+      const mainProducts = company.scrapedData?.mainProducts || [];
+      
+      const marketAnalysisPrompt = `Analyze this company's actual market presence and geographic focus for competitor research:
 
 Company: ${company.name}
 Industry: ${company.industry}
-Description: ${company.description}
-${company.scrapedData?.keywords ? `Keywords: ${company.scrapedData.keywords.join(', ')}` : ''}
-${company.scrapedData?.competitors ? `Known competitors: ${company.scrapedData.competitors.join(', ')}` : ''}
+URL: ${company.url}
+Description: ${description}
+Products/Services: ${mainProducts.join(', ')}
+Keywords: ${keywords.join(', ')}
 
-Based on this company's specific business model and target market, identify ONLY direct competitors that:
-1. Offer the SAME type of products/services (not just retailers that sell them)
-2. Target the SAME customer segment
-3. Have a SIMILAR business model (e.g., if it's a DTC brand, find other DTC brands)
-4. Actually compete for the same customers
+Determine where this company operates and serves customers:
+1. PRIMARY MARKET: Main country/region where they operate
+2. SECONDARY MARKETS: Other regions they serve  
+3. MARKET SCOPE: Local, regional, national, or global
 
-For example:
-- If it's a DTC underwear brand, find OTHER DTC underwear brands (not department stores)
-- If it's a web scraping API, find OTHER web scraping APIs (not general data tools)
-- If it's an AI model provider, find OTHER AI model providers (not AI applications)
+Look for clues like:
+- Language/location mentions in description
+- Domain extension hints (.lt = Lithuania focus)
+- Service area mentions
+- Target customer geography
 
-IMPORTANT: 
-- Only include companies you are confident actually exist
-- Focus on TRUE competitors with similar offerings
-- Exclude retailers, marketplaces, or aggregators unless the company itself is one
-- Aim for 6-9 competitors total
-- Do NOT include general retailers or platforms that just sell/distribute products`;
+Return ONLY a JSON object:
+{
+  "primaryMarket": "Country/Region name", 
+  "secondaryMarkets": ["Country1", "Country2"],
+  "marketScope": "local|regional|national|global"
+}`;
+
+      const { text } = await generateText({
+        model,
+        prompt: marketAnalysisPrompt,
+        temperature: 0.3,
+        maxTokens: 300,
+      });
+
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const marketData = JSON.parse(jsonMatch[0]);
+        location = marketData.primaryMarket || 'Unknown';
+        markets = [location, ...(marketData.secondaryMarkets || [])].filter(m => m !== 'Unknown');
+        
+        console.log('🌍 Detected operating markets:', { primary: location, secondary: marketData.secondaryMarkets });
+      } else {
+        throw new Error('No JSON found in market analysis response');
+      }
+    } catch (error) {
+      console.error('Failed to analyze market presence, using fallback detection:', error);
+      
+      // Fallback to domain-based detection
+      const companyUrl = company.url || '';
+      if (companyUrl.includes('.lt')) location = 'Lithuania';
+      else if (companyUrl.includes('.lv')) location = 'Latvia';
+      else if (companyUrl.includes('.ee')) location = 'Estonia';
+      else if (companyUrl.includes('.de')) location = 'Germany';
+      else if (companyUrl.includes('.uk')) location = 'United Kingdom';
+      else if (companyUrl.includes('.com')) location = 'Global';
+      
+      // Check description for location mentions
+      const contextText = `${company.description || ''} ${company.scrapedData?.keywords?.join(' ') || ''}`.toLowerCase();
+      if (contextText.includes('lithuania')) location = 'Lithuania';
+      else if (contextText.includes('latvia')) location = 'Latvia';
+      else if (contextText.includes('estonia')) location = 'Estonia';
+      else if (contextText.includes('global') || contextText.includes('worldwide')) location = 'Global';
+      
+      markets = [location];
+    }
+
+    const prompt = `You are a market research expert. Find 8-12 direct competitors of this company, focusing on companies that operate in the SAME MARKETS where this company serves customers.
+
+Company Profile:
+- Industry: ${company.industry || 'Unknown'}
+- Primary Market: ${location}
+- Operating Markets: ${markets.join(', ')}
+- Description: ${company.description || 'No description provided'}
+${company.scrapedData?.keywords ? `- Key Areas: ${company.scrapedData.keywords.join(', ')}` : ''}
+${company.scrapedData?.mainProducts ? `- Services/Products: ${company.scrapedData.mainProducts.join(', ')}` : ''}
+
+MARKET-BASED COMPETITOR PRIORITY:
+1. **PRIMARY FOCUS**: Find competitors that serve the same markets: ${markets.join(', ')}
+2. **INDUSTRY MATCH**: Must be in ${company.industry || 'same industry'} with similar products/services
+3. **CUSTOMER OVERLAP**: Target the same customer segments and geographic regions
+4. **REAL COMPETITION**: Actually compete for the same customers, not just same industry
+
+GEOGRAPHIC STRATEGY:
+${location === 'Global' || location === 'United States' ? 
+  `- Global company: Include major international competitors + regional leaders
+  - Focus on companies with strong presence in key markets
+  - Include both established players and emerging competitors` :
+  `- Regional company: Prioritize competitors in ${location} and nearby regions
+  - Include local/regional leaders first, then major international players with local presence
+  - Focus on companies that actually serve ${location} market`
+}
+
+REQUIREMENTS:
+- Find competitors that serve customers in: ${markets.join(', ')}
+- Same industry (${company.industry || 'similar business model'})
+- Similar target customers and business model
+- Actually compete for market share (not just similar companies)
+- Mix of local, regional, and international competitors based on company's market scope
+- Verify companies exist and are active competitors
+
+Focus on finding REAL COMPETITORS that this company would encounter when trying to win customers in their operating markets: ${markets.join(', ')}.`;
 
     const { object } = await generateObject({
       model,
@@ -100,7 +187,7 @@ IMPORTANT:
         return c.competitorType === 'direct' || (c.competitorType === 'indirect' && c.marketOverlap === 'high');
       })
       .map(c => c.name)
-      .slice(0, 9); // Limit to 9 competitors max
+      .slice(0, 12); // Allow up to 12 competitors for better local coverage
 
     // Add any competitors found during scraping
     if (company.scrapedData?.competitors) {
@@ -191,123 +278,233 @@ async function detectIndustryFromContent(company: Company): Promise<string> {
 }
 
 export async function generatePromptsForCompany(company: Company, competitors: string[]): Promise<BrandPrompt[]> {
-  const prompts: BrandPrompt[] = [];
-  let promptId = 0;
-
-  const brandName = company.name;
+  console.log('🤖 Starting AI-powered prompt generation for:', company.name);
   
+  // Get AI provider for prompt generation
+  const configuredProviders = getConfiguredProviders();
+  if (configuredProviders.length === 0) {
+    throw new Error('No AI providers configured for prompt generation');
+  }
+
+  const provider = configuredProviders[0];
+  const model = getProviderModel(provider.id, provider.defaultModel);
+  if (!model) {
+    throw new Error(`AI model not available for ${provider.name}`);
+  }
+
   // Extract context from scraped data
   const scrapedData = company.scrapedData;
   const keywords = scrapedData?.keywords || [];
   const mainProducts = scrapedData?.mainProducts || [];
   const description = scrapedData?.description || company.description || '';
   
-  // Debug log to see what data we're working with
-  console.log('Generating prompts for:', {
-    brandName,
+  // Use AI to detect actual market presence and operating regions
+  let location = 'Unknown';
+  let markets: string[] = [];
+  
+  try {
+    console.log('🌍 Analyzing company market presence with AI...');
+    
+    const marketAnalysisPrompt = `Analyze this company's actual market presence and geographic focus:
+
+Company: ${company.name}
+Industry: ${company.industry}
+URL: ${company.url}
+Description: ${description}
+Products/Services: ${mainProducts.join(', ')}
+Keywords: ${keywords.join(', ')}
+
+Determine:
+1. PRIMARY MARKET: Where does this company primarily operate/serve customers?
+2. SECONDARY MARKETS: What other regions do they serve?
+3. TARGET GEOGRAPHY: Local, regional, national, or global focus?
+
+Look for clues like:
+- Mentions of countries, cities, regions in description
+- Language used on website (Lithuanian content = serves Lithuania)
+- Domain (.lt = likely Lithuania focus, .com = could be global)
+- Product focus (local services vs global software)
+- Keywords mentioning locations
+
+Return ONLY a JSON object:
+{
+  "primaryMarket": "Country/Region name",
+  "secondaryMarkets": ["Country1", "Country2"],
+  "marketScope": "local|regional|national|global",
+  "confidence": 0.8
+}
+
+Example outputs:
+- Lithuanian company: {"primaryMarket": "Lithuania", "secondaryMarkets": ["Latvia", "Estonia"], "marketScope": "regional", "confidence": 0.9}
+- US SaaS: {"primaryMarket": "United States", "secondaryMarkets": ["Canada", "Europe"], "marketScope": "global", "confidence": 0.8}
+- Global service: {"primaryMarket": "Global", "secondaryMarkets": [], "marketScope": "global", "confidence": 0.7}`;
+
+    const { text } = await generateText({
+      model,
+      prompt: marketAnalysisPrompt,
+      temperature: 0.3,
+      maxTokens: 300,
+    });
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const marketData = JSON.parse(jsonMatch[0]);
+      location = marketData.primaryMarket || 'Unknown';
+      markets = [location, ...(marketData.secondaryMarkets || [])].filter(m => m !== 'Unknown');
+      
+      console.log('🌍 AI detected markets:', {
+        primary: location,
+        secondary: marketData.secondaryMarkets,
+        scope: marketData.marketScope,
+        confidence: marketData.confidence
+      });
+    }
+  } catch (error) {
+    console.error('Failed to analyze market presence with AI, falling back to domain detection:', error);
+    
+    // Fallback to domain + content analysis
+    const companyUrl = company.url || '';
+    if (companyUrl.includes('.lt')) location = 'Lithuania';
+    else if (companyUrl.includes('.lv')) location = 'Latvia';
+    else if (companyUrl.includes('.ee')) location = 'Estonia';
+    else if (companyUrl.includes('.fi')) location = 'Finland';
+    else if (companyUrl.includes('.se')) location = 'Sweden';
+    else if (companyUrl.includes('.de')) location = 'Germany';
+    else if (companyUrl.includes('.fr')) location = 'France';
+    else if (companyUrl.includes('.uk') || companyUrl.includes('.co.uk')) location = 'United Kingdom';
+    else if (companyUrl.includes('.au')) location = 'Australia';
+    else if (companyUrl.includes('.ca')) location = 'Canada';
+    else if (companyUrl.includes('.com') || companyUrl.includes('.org') || companyUrl.includes('.net')) location = 'United States';
+    
+    // Check description for location mentions
+    const contextText = `${description} ${keywords.join(' ')}`.toLowerCase();
+    if (contextText.includes('lithuania') || contextText.includes('vilnius') || contextText.includes('kaunas')) location = 'Lithuania';
+    else if (contextText.includes('latvia') || contextText.includes('riga')) location = 'Latvia';
+    else if (contextText.includes('estonia') || contextText.includes('tallinn')) location = 'Estonia';
+    else if (contextText.includes('europe') || contextText.includes('european')) location = 'Europe';
+    else if (contextText.includes('global') || contextText.includes('worldwide') || contextText.includes('international')) location = 'Global';
+    
+    markets = [location];
+  }
+
+  console.log('🔍 Company context for AI prompt generation:', {
+    name: company.name,
     industry: company.industry,
+    location,
     mainProducts,
     keywords: keywords.slice(0, 5),
     competitors: competitors.slice(0, 5)
   });
-  
-  // Build a more specific context from the scraped data
-  let productContext = '';
-  let categoryContext = '';
-  
-  // If we have specific products, use those first
-  if (mainProducts.length > 0) {
-    productContext = mainProducts.slice(0, 2).join(' and ');
-    // Infer category from products
-    const productsLower = mainProducts.join(' ').toLowerCase();
-    if (productsLower.includes('cooler') || productsLower.includes('drinkware')) {
-      categoryContext = 'outdoor gear brands';
-    } else if (productsLower.includes('software') || productsLower.includes('api')) {
-      categoryContext = 'software companies';
-    } else {
-      categoryContext = `${mainProducts[0]} brands`;
-    }
-  }
-  
-  // Analyze keywords and description to understand what the company actually does
-  const keywordsLower = keywords.map(k => k.toLowerCase()).join(' ');
-  const descLower = description.toLowerCase();
-  const allContext = `${keywordsLower} ${descLower} ${mainProducts.join(' ')}`;
-  
-  // Only determine category if we don't already have it from mainProducts
-  if (!productContext) {
-    // Check industry first for more accurate categorization
-    const industryLower = (company.industry || '').toLowerCase();
-    
-    if (industryLower === 'outdoor gear' || allContext.includes('cooler') || allContext.includes('drinkware') || allContext.includes('tumbler') || allContext.includes('outdoor')) {
-      productContext = 'coolers and drinkware';
-      categoryContext = 'outdoor gear brands';
-    } else if (industryLower === 'web scraping' || allContext.includes('web scraping') || allContext.includes('data extraction') || allContext.includes('crawler')) {
-      productContext = 'web scraping tools';
-      categoryContext = 'data extraction services';
-    } else if (allContext.includes('ai') || allContext.includes('artificial intelligence') || allContext.includes('machine learning')) {
-      productContext = 'AI tools';
-      categoryContext = 'artificial intelligence platforms';
-    } else if (allContext.includes('software') || allContext.includes('saas') || allContext.includes('application')) {
-      productContext = 'software solutions';
-      categoryContext = 'SaaS platforms';
-    } else if (allContext.includes('clothing') || allContext.includes('apparel') || allContext.includes('fashion')) {
-      productContext = 'clothing and apparel';
-      categoryContext = 'fashion brands';
-    } else if (allContext.includes('furniture') || allContext.includes('home') || allContext.includes('decor')) {
-      productContext = 'furniture and home goods';
-      categoryContext = 'home furnishing brands';
-    } else {
-      // Fallback: use the most prominent keywords, but avoid misclassifications
-      productContext = keywords.slice(0, 3).join(' and ') || 'products';
-      categoryContext = company.industry || 'companies';
-    }
-  }
-  
-  // Safety check: if we somehow got "beverage" but it's clearly not a beverage company
-  if (productContext.includes('beverage') && (brandName.toLowerCase() === 'yeti' || allContext.includes('cooler'))) {
-    productContext = 'coolers and outdoor gear';
-    categoryContext = 'outdoor equipment brands';
-  }
 
-  // Generate contextually relevant prompts
-  const contextualTemplates = {
-    ranking: [
-      `best ${productContext} in 2024`,
-      `top ${categoryContext} ranked by quality`,
-      mainProducts.length > 0 ? `most recommended ${mainProducts[0]}` : `most recommended ${productContext}`,
-      keywords.length > 0 ? `best brands for ${keywords[0]}` : `popular ${categoryContext}`,
-    ],
-    comparison: [
-      `${brandName} vs ${competitors.slice(0, 2).join(' vs ')} for ${productContext}`,
-      `how does ${brandName} compare to other ${categoryContext}`,
-      competitors[0] && mainProducts[0] ? `${competitors[0]} or ${brandName} which has better ${mainProducts[0]}` : `${brandName} compared to alternatives`,
-    ],
-    alternatives: [
-      `alternatives to ${brandName} ${mainProducts[0] || productContext}`,
-      `${categoryContext} similar to ${brandName}`,
-      `competitors of ${brandName} in ${productContext.split(' ')[0]} market`,
-    ],
-    recommendations: [
-      mainProducts.length > 0 ? `is ${brandName} ${mainProducts[0]} worth buying` : `is ${brandName} worth it for ${productContext}`,
-      `${brandName} ${productContext} reviews and recommendations`,
-      `should I buy ${brandName} or other ${categoryContext}`,
-      `best ${productContext} for ${keywords.includes('professional') ? 'professionals' : keywords.includes('outdoor') ? 'outdoor enthusiasts' : 'everyday use'}`,
-    ],
-  };
+  // Create comprehensive AI prompt for generating analysis prompts
+  const primaryMarket = location;
+  const isGlobal = location === 'Global' || location === 'United States' || markets.some(m => m === 'Global');
+  
+  const aiPromptRequest = `You are an expert at creating search queries that real people would use. Generate 15 analysis prompts for ${company.industry} companies: 10 SIMPLE popular searches + 5 ADVANCED analysis prompts.
 
-  // Generate prompts from contextual templates
-  Object.entries(contextualTemplates).forEach(([category, templates]) => {
-    templates.forEach(prompt => {
-      prompts.push({
-        id: (++promptId).toString(),
-        prompt,
-        category: category as BrandPrompt['category'],
-      });
+Company Profile:
+- Name: ${company.name}
+- Industry: ${company.industry}
+- Primary Market: ${primaryMarket}
+- Market Scope: ${isGlobal ? 'Global/International' : 'Local/Regional'}
+- Products/Services: ${mainProducts.join(', ') || 'Not specified'}
+- Description: ${description}
+- Keywords: ${keywords.join(', ')}
+
+Key Competitors: ${competitors.join(', ')}
+
+MARKET-AWARE PROMPT GENERATION:
+${isGlobal ? 
+  `- This is a GLOBAL/INTERNATIONAL company - create prompts that reflect international scope
+  - Use broader geographic terms: "best globally", "worldwide leaders", "top international"
+  - Focus on global market leadership and international presence` :
+  `- This is a LOCAL/REGIONAL company with primary market: ${primaryMarket}
+  - Make prompts location-specific to their PRIMARY MARKET ONLY
+  - Use specific geographic terms: "in ${primaryMarket}", "best in ${primaryMarket}"
+  - DO NOT use multiple countries - focus on ${primaryMarket} only`
+}
+
+REQUIREMENTS:
+Generate EXACTLY 15 prompts in this structure:
+
+**10 SIMPLE PROMPTS (what people actually search for):**
+- Use simple, common language that real people search on Google
+- Focus on "best", "top", "most trusted", "cheapest", "fastest", etc.
+- Make them market-specific to PRIMARY MARKET: ${primaryMarket}
+- Examples: "best business credit companies${isGlobal ? ' globally' : ' in ' + primaryMarket}", "most trusted ${company.industry} providers"
+
+**5 ADVANCED PROMPTS (detailed analysis):**
+- More sophisticated comparative analysis  
+- Focus on specific business factors, innovation, market positioning
+- Still no company names mentioned
+
+DO NOT mention specific company names in any prompts - use generic terms.
+
+Examples for ${company.industry}:
+SIMPLE: "best ${company.industry} companies${isGlobal ? ' worldwide' : ' in ' + primaryMarket}"
+SIMPLE: "most trusted ${company.industry} providers${isGlobal ? '' : ' in ' + primaryMarket}" 
+SIMPLE: "cheapest ${company.industry} options"
+ADVANCED: "Which ${company.industry} providers offer the most innovative solutions for enterprise clients?"
+
+Return ONLY a JSON array with this exact format:
+[
+  {"prompt": "best ${company.industry} companies${isGlobal ? ' worldwide' : ' in ' + primaryMarket}", "category": "simple"},
+  {"prompt": "most trusted ${company.industry} providers", "category": "simple"},
+  {"prompt": "top rated ${company.industry} companies", "category": "simple"},
+  ...10 simple prompts...
+  {"prompt": "Which ${company.industry} providers demonstrate the strongest competitive advantages in emerging market segments?", "category": "advanced"},
+  ...5 advanced prompts...
+]
+
+Generate exactly 15 prompts: 10 simple + 5 advanced.`;
+
+  console.log('🤖 Sending AI request for dynamic prompt generation...');
+
+  try {
+    // Use AI to generate prompts dynamically
+    const { text } = await generateText({
+      model,
+      prompt: aiPromptRequest,
+      temperature: 0.4,
+      maxTokens: 2000,
     });
-  });
 
-  return prompts;
+    console.log('🤖 AI response received:', text.substring(0, 200) + '...');
+
+    // Parse the AI response
+    let aiGeneratedPrompts;
+    try {
+      // Extract JSON from the response
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        aiGeneratedPrompts = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('No JSON array found in AI response');
+      }
+    } catch (parseError) {
+      console.error('Failed to parse AI response as JSON:', parseError);
+      throw new Error('AI generated invalid prompt format');
+    }
+
+    // Validate and convert to BrandPrompt format
+    const prompts: BrandPrompt[] = aiGeneratedPrompts
+      .filter((p: any) => p.prompt && typeof p.prompt === 'string')
+      .slice(0, 15) // Ensure max 15 prompts
+      .map((p: any, index: number) => ({
+        id: (index + 1).toString(),
+        prompt: p.prompt,
+        category: 'ranking' as const
+      }));
+
+    console.log(`✅ Successfully generated ${prompts.length} AI-powered prompts for ${company.name}`);
+    console.log('📝 Sample prompts:', prompts.slice(0, 3).map(p => p.prompt));
+
+    return prompts;
+
+  } catch (error) {
+    console.error('❌ AI prompt generation failed:', error);
+    throw new Error(`Failed to generate AI prompts: ${(error as Error).message}`);
+  }
 }
 
 export async function analyzePromptWithProvider(

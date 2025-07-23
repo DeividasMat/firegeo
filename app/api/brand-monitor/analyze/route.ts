@@ -35,49 +35,7 @@ export async function POST(request: NextRequest) {
       throw new AuthenticationError('Please log in to use brand monitor');
     }
 
-    // Check if user has enough credits (10 credits per analysis)
-    try {
-      console.log('[Brand Monitor] Checking access - Customer ID:', sessionResponse.user.id);
-      const access = await autumn.check({
-        customer_id: sessionResponse.user.id,
-        feature_id: FEATURE_ID_MESSAGES,
-      });
-      console.log('[Brand Monitor] Access check result:', JSON.stringify(access.data, null, 2));
-      
-      if (!access.data?.allowed || (access.data?.balance && access.data.balance < CREDITS_PER_BRAND_ANALYSIS)) {
-        console.log('[Brand Monitor] Insufficient credits - Balance:', access.data?.balance);
-        throw new InsufficientCreditsError(
-          ERROR_MESSAGES.INSUFFICIENT_CREDITS_BRAND_ANALYSIS,
-          CREDITS_PER_BRAND_ANALYSIS,
-          access.data?.balance || 0
-        );
-      }
-    } catch (err) {
-      console.error('[Brand Monitor] Failed to check access:', err);
-      throw new ExternalServiceError('Unable to verify credits. Please try again', 'autumn');
-    }
-
-    // Track usage (10 credits)
-    try {
-      console.log('[Brand Monitor] Tracking usage - Customer ID:', sessionResponse.user.id, 'Count:', CREDITS_PER_BRAND_ANALYSIS);
-      const trackResult = await autumn.track({
-        customer_id: sessionResponse.user.id,
-        feature_id: FEATURE_ID_MESSAGES,
-        count: CREDITS_PER_BRAND_ANALYSIS,
-      });
-      console.log('[Brand Monitor] Track result:', JSON.stringify(trackResult, null, 2));
-    } catch (err) {
-      console.error('[Brand Monitor] Failed to track usage:', err);
-      // Log more details about the error
-      if (err instanceof Error) {
-        console.error('[Brand Monitor] Error details:', {
-          message: err.message,
-          stack: err.stack,
-          response: (err as any).response?.data
-        });
-      }
-      throw new ExternalServiceError('Unable to process credit deduction. Please try again', 'autumn');
-    }
+    // No credit checks or usage tracking needed - completely free platform
 
     const { company, prompts: customPrompts, competitors: userSelectedCompetitors, useWebSearch = false } = await request.json();
 
@@ -102,16 +60,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Get remaining credits after deduction
-    let remainingCredits = 0;
-    try {
-      const usage = await autumn.check({
-        customer_id: sessionResponse.user.id,
-        feature_id: FEATURE_ID_MESSAGES,
-      });
-      remainingCredits = usage.data?.balance || 0;
-    } catch (err) {
-      console.error('Failed to get remaining credits:', err);
-    }
+    // No credit tracking needed - completely free platform
+    let remainingCredits = 999999; // Show unlimited credits
 
     // Create a TransformStream for SSE
     const encoder = new TextEncoder();

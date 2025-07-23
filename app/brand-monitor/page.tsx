@@ -4,7 +4,7 @@ import { BrandMonitor } from '@/components/brand-monitor/brand-monitor';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sparkles, Menu, X, Plus, Trash2, Loader2 } from 'lucide-react';
-import { useCustomer, useRefreshCustomer } from '@/hooks/useAutumnCustomer';
+
 import { useBrandAnalyses, useBrandAnalysis, useDeleteBrandAnalysis } from '@/hooks/useBrandAnalyses';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
@@ -14,8 +14,7 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 // Separate component that uses Autumn hooks
 function BrandMonitorContent({ session }: { session: any }) {
   const router = useRouter();
-  const { customer, isLoading, error } = useCustomer();
-  const refreshCustomer = useRefreshCustomer();
+  // No customer/billing system needed - completely free platform
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -27,20 +26,7 @@ function BrandMonitorContent({ session }: { session: any }) {
   const deleteAnalysis = useDeleteBrandAnalysis();
   
   // Get credits from customer data
-  const messageUsage = customer?.features?.messages;
-  const credits = messageUsage ? (messageUsage.balance || 0) : 0;
-
-  useEffect(() => {
-    // If there's an auth error, redirect to login
-    if (error?.code === 'UNAUTHORIZED' || error?.code === 'AUTH_ERROR') {
-      router.push('/login');
-    }
-  }, [error, router]);
-
-  const handleCreditsUpdate = async () => {
-    // Use the global refresh to update customer data everywhere
-    await refreshCustomer();
-  };
+  // No billing system needed - completely free platform
   
   const handleDeleteAnalysis = async (analysisId: string) => {
     setAnalysisToDelete(analysisId);
@@ -161,8 +147,6 @@ function BrandMonitorContent({ session }: { session: any }) {
         <div className="flex-1 overflow-y-auto">
           <div className="px-6 sm:px-8 lg:px-12 py-8">
             <BrandMonitor 
-              creditsAvailable={credits} 
-              onCreditsUpdate={handleCreditsUpdate}
               selectedAnalysis={selectedAnalysisId ? currentAnalysis : null}
               onSaveAnalysis={(analysis) => {
                 // This will be called when analysis completes
@@ -188,25 +172,8 @@ function BrandMonitorContent({ session }: { session: any }) {
 }
 
 export default function BrandMonitorPage() {
-  const { data: session, isPending } = useSession();
-
-  if (isPending) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-      </div>
-    );
-  }
-
-  if (!session) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600">Please log in to access the brand monitor</p>
-        </div>
-      </div>
-    );
-  }
-
-  return <BrandMonitorContent session={session} />;
+  // No authentication required - completely public access
+  const mockSession = { user: { id: 'public-user', email: 'public@access.com', name: 'Public User' } };
+  
+  return <BrandMonitorContent session={mockSession} />;
 }
