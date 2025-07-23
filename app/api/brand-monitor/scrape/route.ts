@@ -12,21 +12,23 @@ import {
 import { FEATURE_ID_MESSAGES } from '@/config/constants';
 
 const autumn = new Autumn({
-  apiKey: process.env.AUTUMN_SECRET_KEY!,
+  secretKey: process.env.AUTUMN_SECRET_KEY!,
 });
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the session
-    const sessionResponse = await auth.api.getSession({
-      headers: request.headers,
-    });
-
-    if (!sessionResponse?.user) {
-      throw new AuthenticationError('Please log in to use this feature');
+    // Try to get the session, but don't require it for free platform
+    let user = null;
+    try {
+      const sessionResponse = await auth.api.getSession({
+        headers: request.headers,
+      });
+      user = sessionResponse?.user || null;
+    } catch (authError) {
+      console.warn('Authentication failed, running in free mode:', authError);
+      // Continue without authentication for free platform
     }
 
-    // Check if user has enough credits (1 credit for URL scraping)
     // No credit checks needed - completely free platform
 
     const { url, maxAge } = await request.json();
@@ -43,16 +45,18 @@ export async function POST(request: NextRequest) {
       normalizedUrl = `https://${normalizedUrl}`;
     }
 
-    // Track usage (1 credit for scraping)
-    try {
-      await autumn.track({
-        customer_id: sessionResponse.user.id,
-        feature_id: FEATURE_ID_MESSAGES,
-        count: 1,
-      });
-    } catch (err) {
-      console.error('[Brand Monitor Scrape] Error tracking usage:', err);
-      // Continue even if tracking fails - we don't want to block the user
+    // Track usage (1 credit for scraping) - only if user is authenticated
+    if (user?.id) {
+      try {
+        await autumn.track({
+          customer_id: user.id,
+          feature_id: FEATURE_ID_MESSAGES,
+          value: 1,
+        });
+      } catch (err) {
+        console.error('[Brand Monitor Scrape] Error tracking usage:', err);
+        // Continue even if tracking fails - we don't want to block the user
+      }
     }
 
     const company = await scrapeCompanyInfo(normalizedUrl, maxAge);

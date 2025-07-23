@@ -72,18 +72,25 @@ export function BrandMonitor({
           creditsUsed: 0
         };
         
-        saveAnalysis.mutate(analysisData, {
-          onSuccess: (savedAnalysis) => {
-            console.log('Analysis saved successfully:', savedAnalysis);
-            if (onSaveAnalysis) {
-              onSaveAnalysis(savedAnalysis);
+        // Try to save analysis, but don't fail if database is unavailable
+        try {
+          saveAnalysis.mutate(analysisData, {
+            onSuccess: (savedAnalysis) => {
+              console.log('Analysis saved successfully:', savedAnalysis);
+              if (onSaveAnalysis) {
+                onSaveAnalysis(savedAnalysis);
+              }
+            },
+            onError: (error) => {
+              console.warn('Failed to save analysis (continuing in free mode):', error);
+              hasSavedRef.current = false;
+              // Don't show error to user - just log it
             }
-          },
-          onError: (error) => {
-            console.error('Failed to save analysis:', error);
-            hasSavedRef.current = false;
-          }
-        });
+          });
+        } catch (saveError) {
+          console.warn('Analysis save unavailable in free mode:', saveError);
+          hasSavedRef.current = false;
+        }
       }
     }
   });
@@ -197,14 +204,21 @@ export function BrandMonitor({
       if (!response.ok) {
         try {
           const errorData = await response.json();
-          console.error('Scrape API error:', errorData);
-          if (errorData.error?.message) {
-            throw new ClientApiError(errorData);
+          console.warn('Scrape API returned error, but continuing in free mode:', errorData);
+          
+          // For auth errors, just continue - we're in free mode
+          if (response.status === 401 || errorData.error?.includes('session')) {
+            console.log('Authentication failed, but scraping may still work in free mode');
+            // Don't throw error for auth issues - let the API handle it
+          } else {
+            throw new Error(errorData.error || 'Failed to scrape');
           }
-          throw new Error(errorData.error || 'Failed to scrape');
         } catch (e) {
-          if (e instanceof ClientApiError) throw e;
-          throw new Error('Failed to scrape');
+          if (e instanceof Error && e.message !== 'Failed to scrape') {
+            console.warn('Error parsing response, continuing anyway');
+          } else {
+            throw e;
+          }
         }
       }
 
@@ -458,6 +472,79 @@ export function BrandMonitor({
     hasSavedRef.current = false;
     setIsLoadingExistingAnalysis(false);
   }, []);
+
+  const handleGenerateReport = useCallback(async () => {
+    if (!analysis || !company) {
+      console.error('No analysis data available for report generation');
+      return;
+    }
+
+    try {
+      console.log('🎯 Generating comprehensive report...');
+      
+      const response = await fetch('/api/brand-monitor/generate-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          analysis,
+          company,
+          competitors: identifiedCompetitors
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate report');
+      }
+
+      // Get the HTML content
+      const reportHtml = await response.text();
+      
+      // Open in new window for PDF generation
+      const reportWindow = window.open('', '_blank');
+      if (reportWindow) {
+        reportWindow.document.write(reportHtml);
+        reportWindow.document.close();
+        
+        // Add print styles and trigger print dialog
+        reportWindow.addEventListener('load', () => {
+          // Add CSS for better printing
+          const printCSS = reportWindow.document.createElement('style');
+          printCSS.textContent = `
+            @media print {
+              body { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; }
+              .section { page-break-before: always !important; }
+              * { -webkit-print-color-adjust: exact !important; }
+            }
+          `;
+          reportWindow.document.head.appendChild(printCSS);
+          
+          // Auto-trigger print dialog after a short delay
+          setTimeout(() => {
+            reportWindow.print();
+          }, 1000);
+        });
+      } else {
+        // Fallback: create downloadable HTML file
+        const blob = new Blob([reportHtml], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${company.name}-Brand-Analysis-Report.html`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+
+    } catch (error) {
+      console.error('Error generating report:', error);
+      dispatch({ 
+        type: 'SET_ERROR', 
+        payload: `Failed to generate report: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      });
+    }
+  }, [analysis, company, identifiedCompetitors]);
   
   const batchScrapeAndValidateCompetitors = useCallback(async (competitors: IdentifiedCompetitor[]) => {
     const validatedCompetitors = competitors.map(comp => ({
@@ -647,6 +734,86 @@ export function BrandMonitor({
                         brandName={analysis.company?.name || ''}
                         competitors={analysis.competitors?.map(c => c.name) || []}
                       />
+                    </CardContent>
+                  </Card>
+                )}
+
+                {activeResultsTab === 'report' && (
+                  <Card className="p-2 bg-card text-card-foreground gap-6 rounded-xl border py-6 shadow-sm border-gray-200 h-full flex flex-col">
+                    <CardHeader className="border-b">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <CardTitle className="text-xl font-semibold flex items-center gap-2">
+                            📊 PDF Report
+                          </CardTitle>
+                          <CardDescription className="text-sm text-gray-600 mt-1">
+                            Generate comprehensive analysis report with AI insights
+                          </CardDescription>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-blue-600">PDF</p>
+                          <p className="text-xs text-gray-500 mt-1">Download Ready</p>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-6 flex-1 flex flex-col justify-center items-center">
+                      <div className="text-center max-w-md">
+                        <div className="mb-8">
+                          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-10 h-10 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <h3 className="text-xl font-semibold text-gray-900 mb-2">Professional Analysis Report</h3>
+                          <p className="text-gray-600 mb-6">
+                            Generate a comprehensive PDF report with AI-powered insights, executive summary, competitive analysis, and strategic recommendations.
+                          </p>
+                        </div>
+                        
+                        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                          <h4 className="font-medium text-gray-900 mb-3">Report Includes:</h4>
+                          <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              Executive Summary
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              Competitive Analysis
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              Search Performance
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              Strategic Recommendations
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              Market Positioning
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              Methodology
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={handleGenerateReport}
+                          className="w-full bg-blue-600 text-white font-medium py-4 px-6 rounded-[10px] hover:bg-blue-700 transition-all duration-200 [box-shadow:inset_0px_-2.108433723449707px_0px_0px_#1e40af,_0px_1.2048193216323853px_6.325301647186279px_0px_rgba(59,_130,_246,_58%)] hover:translate-y-[1px] hover:scale-[0.98] hover:[box-shadow:inset_0px_-1px_0px_0px_#1e40af,_0px_1px_3px_0px_rgba(59,_130,_246,_40%)] active:translate-y-[2px] active:scale-[0.97] active:[box-shadow:inset_0px_1px_1px_0px_#1e40af,_0px_1px_2px_0px_rgba(59,_130,_246,_30%)] flex items-center justify-center gap-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Generate & Download PDF Report
+                        </button>
+                        
+                        <p className="text-xs text-gray-500 mt-3">
+                          Report will open in a new window with print-to-PDF option
+                        </p>
+                      </div>
                     </CardContent>
                   </Card>
                 )}
