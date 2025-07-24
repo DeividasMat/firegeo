@@ -23,12 +23,6 @@ export function Navbar() {
 
           <div className="flex items-center space-x-4">
             <Link
-              href="/chat"
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              AI Chat
-            </Link>
-            <Link
               href="/brand-monitor"
               className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
             >

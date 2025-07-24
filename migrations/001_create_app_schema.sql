@@ -4,12 +4,6 @@
 
 -- Create custom types
 DO $$ BEGIN
-    CREATE TYPE "role" AS ENUM('user', 'assistant');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
     CREATE TYPE "theme" AS ENUM('light', 'dark');
 EXCEPTION
     WHEN duplicate_object THEN null;
@@ -28,37 +22,6 @@ CREATE TABLE IF NOT EXISTS "brand_analyses" (
     "credits_used" integer DEFAULT 10,
     "created_at" timestamp DEFAULT now(),
     "updated_at" timestamp DEFAULT now()
-);
-
--- Chat Conversations
-CREATE TABLE IF NOT EXISTS "conversations" (
-    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    "user_id" text NOT NULL,
-    "title" text,
-    "last_message_at" timestamp,
-    "created_at" timestamp DEFAULT now(),
-    "updated_at" timestamp DEFAULT now()
-);
-
--- Chat Messages
-CREATE TABLE IF NOT EXISTS "messages" (
-    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    "conversation_id" uuid NOT NULL REFERENCES "conversations"("id") ON DELETE CASCADE,
-    "user_id" text NOT NULL,
-    "role" "role" NOT NULL,
-    "content" text NOT NULL,
-    "token_count" integer,
-    "created_at" timestamp DEFAULT now()
-);
-
--- Message Feedback
-CREATE TABLE IF NOT EXISTS "message_feedback" (
-    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    "message_id" uuid NOT NULL REFERENCES "messages"("id") ON DELETE CASCADE,
-    "user_id" text NOT NULL,
-    "rating" integer,
-    "feedback" text,
-    "created_at" timestamp DEFAULT now()
 );
 
 -- User Profile
@@ -88,7 +51,3 @@ CREATE TABLE IF NOT EXISTS "user_settings" (
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS "idx_brand_analyses_user_id" ON "brand_analyses"("user_id");
-CREATE INDEX IF NOT EXISTS "idx_conversations_user_id" ON "conversations"("user_id");
-CREATE INDEX IF NOT EXISTS "idx_messages_conversation_id" ON "messages"("conversation_id");
-CREATE INDEX IF NOT EXISTS "idx_messages_user_id" ON "messages"("user_id");
-CREATE INDEX IF NOT EXISTS "idx_message_feedback_message_id" ON "message_feedback"("message_id");

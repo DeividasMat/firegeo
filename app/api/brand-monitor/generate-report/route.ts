@@ -1020,7 +1020,7 @@ function generateGeoAnalysisReport({ company, competitors, analysis, sectionInsi
             
             <h1 class="page-title">Table of Contents</h1>
             
-            <div style="margin-top: 40px;">
+            <div style="margin-top: 80px;">
                 <div style="display: flex; flex-direction: column; gap: 20px; max-width: 500px;">
                     
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #f8fafc; border-radius: 8px; border-left: 4px solid #667eea;">
