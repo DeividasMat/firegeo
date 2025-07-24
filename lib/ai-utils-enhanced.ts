@@ -474,7 +474,7 @@ export async function runEnhancedBrandAnalysis(
       message: 'Generating competitive insights...',
       progress: 95
     });
-    
+
     return {
       company,
       competitors,
