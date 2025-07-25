@@ -384,16 +384,17 @@ export function BrandMonitor({
 
     // No credit checks needed - completely free platform
 
-    // Use pre-generated prompts or generate them if not available
-    let allPrompts = [...customPrompts]; // Start with custom prompts
+    // Determine which prompts to use based on user's choices
+    let allPrompts: string[] = [];
     
-    if (analyzingPrompts.length > 0) {
-      // Use pre-generated prompts from the prompts screen
-      console.log(`✅ Using ${analyzingPrompts.length} pre-generated AI prompts`);
+    // Priority 1: Use existing prompts (both generated and custom) if available
+    if (analyzingPrompts.length > 0 || customPrompts.length > 0) {
+      // Combine remaining generated prompts with custom prompts
       allPrompts = [...analyzingPrompts, ...customPrompts];
+      console.log(`✅ Using ${analyzingPrompts.length} generated + ${customPrompts.length} custom prompts`);
     } else {
-      // Fallback: generate prompts now if they weren't pre-generated
-      console.log('🎯 Generating AI prompts during analysis (fallback)...');
+      // Priority 2: Only generate new prompts if user has NO prompts at all
+      console.log('🎯 No prompts available, generating AI prompts as fallback...');
       
       try {
         const response = await fetch('/api/brand-monitor/generate-prompts', {
@@ -408,8 +409,8 @@ export function BrandMonitor({
         const responseData = await response.json();
         
         if (response.ok && responseData.success && responseData.prompts) {
-          console.log(`✅ Fallback generated ${responseData.prompts.length} prompts`);
-          allPrompts = [...responseData.prompts, ...customPrompts];
+          console.log(`✅ Generated ${responseData.prompts.length} fallback prompts`);
+          allPrompts = responseData.prompts;
         } else {
           const errorMessage = responseData.details || responseData.error || 'Unknown error';
           console.error('❌ AI prompt generation failed:', errorMessage);
@@ -421,6 +422,12 @@ export function BrandMonitor({
         dispatch({ type: 'SET_ERROR', payload: 'Failed to connect to AI services. Please check your internet connection and try again.' });
         return;
       }
+    }
+    
+    // Ensure we have at least some prompts to analyze
+    if (allPrompts.length === 0) {
+      dispatch({ type: 'SET_ERROR', payload: 'No prompts available for analysis. Please add custom prompts or generate AI prompts.' });
+      return;
     }
     
     // Store the prompts for UI display - make sure they're normalized
