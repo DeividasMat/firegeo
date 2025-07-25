@@ -3,49 +3,53 @@ import { generateText } from 'ai';
 import { getProviderModel } from '@/lib/provider-config';
 import { auth } from '@/lib/auth';
 
-// Function to sanitize Unicode characters that cause ByteString conversion errors
+// Function to sanitize only problematic characters while keeping emojis
 function sanitizeForByteString(text: string): string {
   if (!text || typeof text !== 'string') return '';
   
-  return text
-    // Replace common problematic Unicode characters
-    .replace(/[\u0100-\uFFFF]/g, (char) => {
-      const code = char.charCodeAt(0);
-      if (code > 255) {
-        // Replace with ASCII equivalents where possible
-        const replacements: Record<string, string> = {
-          // Emojis - replace with text equivalents
-          '\u{1F3AF}': '→', // 🎯
-          '\u{1F4CA}': 'Chart:', // 📊
-          '\u{1F680}': '→', // 🚀
-          '\u{1F451}': '*', // 👑
-          '\u{1F4C8}': '↗', // 📈
-          '\u{1F525}': '!!', // 🔥
-          '\u{26A0}\u{FE0F}': 'Warning:', // ⚠️
-          '\u{1F4CB}': 'Report:', // 📋
-          // Common accented characters
-          '\u00E9': 'e', '\u00E8': 'e', '\u00EA': 'e', '\u00EB': 'e',
-          '\u00E1': 'a', '\u00E0': 'a', '\u00E2': 'a', '\u00E4': 'a',
-          '\u00ED': 'i', '\u00EC': 'i', '\u00EE': 'i', '\u00EF': 'i',
-          '\u00F3': 'o', '\u00F2': 'o', '\u00F4': 'o', '\u00F6': 'o',
-          '\u00FA': 'u', '\u00F9': 'u', '\u00FB': 'u', '\u00FC': 'u',
-          '\u00F1': 'n', '\u00E7': 'c',
-          // Quotes
-          '\u2018': "'", '\u2019': "'", '\u201C': '"', '\u201D': '"',
-          // Dashes
-          '\u2013': '-', '\u2014': '-',
-          // Other common symbols
-          '\u2026': '...',
-        };
-        
-        return replacements[char] || '?';
-      }
-      return char;
-    })
-    // Remove any remaining high Unicode characters
-    .replace(/[^\x00-\xFF]/g, '?')
-    // Clean up multiple question marks
-    .replace(/\?+/g, '?');
+  // Only replace Lithuanian and other Baltic special characters
+  const lithuanianReplacements: Record<string, string> = {
+    // Lithuanian characters
+    'Ą': 'A', 'ą': 'a',
+    'Č': 'C', 'č': 'c',
+    'Ę': 'E', 'ę': 'e',
+    'Ė': 'E', 'ė': 'e',
+    'Į': 'I', 'į': 'i',
+    'Š': 'S', 'š': 's',
+    'Ų': 'U', 'ų': 'u',
+    'Ū': 'U', 'ū': 'u',
+    'Ž': 'Z', 'ž': 'z',
+    
+    // Latvian characters
+    'Ā': 'A', 'ā': 'a',
+    'Ē': 'E', 'ē': 'e',
+    'Ģ': 'G', 'ģ': 'g',
+    'Ī': 'I', 'ī': 'i',
+    'Ķ': 'K', 'ķ': 'k',
+    'Ļ': 'L', 'ļ': 'l',
+    'Ņ': 'N', 'ņ': 'n',
+    'Ō': 'O', 'ō': 'o',
+    
+    // Estonian characters
+    'Õ': 'O', 'õ': 'o',
+    'Ä': 'A', 'ä': 'a',
+    'Ö': 'O', 'ö': 'o',
+    'Ü': 'U', 'ü': 'u',
+    
+    // Common problematic quotes and dashes (keep emojis intact)
+    '\u201C': '"', '\u201D': '"', // Smart quotes
+    '\u2018': "'", '\u2019': "'", // Smart single quotes
+    '\u2013': '-', '\u2014': '-', // En dash, Em dash
+    '\u2026': '...', // Ellipsis
+  };
+  
+  // Replace only the specified characters, keep everything else including emojis
+  let result = text;
+  for (const [lithuanian, english] of Object.entries(lithuanianReplacements)) {
+    result = result.replace(new RegExp(lithuanian, 'g'), english);
+  }
+  
+  return result;
 }
 
 // Sanitize objects recursively
