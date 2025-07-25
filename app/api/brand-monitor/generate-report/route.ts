@@ -3,6 +3,72 @@ import { generateText } from 'ai';
 import { getProviderModel } from '@/lib/provider-config';
 import { auth } from '@/lib/auth';
 
+// Function to sanitize Unicode characters that cause ByteString conversion errors
+function sanitizeForByteString(text: string): string {
+  if (!text || typeof text !== 'string') return '';
+  
+  return text
+    // Replace common problematic Unicode characters
+    .replace(/[\u0100-\uFFFF]/g, (char) => {
+      const code = char.charCodeAt(0);
+      if (code > 255) {
+        // Replace with ASCII equivalents where possible
+        const replacements: Record<string, string> = {
+          // Emojis - replace with text equivalents
+          '\u{1F3AF}': '→', // 🎯
+          '\u{1F4CA}': 'Chart:', // 📊
+          '\u{1F680}': '→', // 🚀
+          '\u{1F451}': '*', // 👑
+          '\u{1F4C8}': '↗', // 📈
+          '\u{1F525}': '!!', // 🔥
+          '\u{26A0}\u{FE0F}': 'Warning:', // ⚠️
+          '\u{1F4CB}': 'Report:', // 📋
+          // Common accented characters
+          '\u00E9': 'e', '\u00E8': 'e', '\u00EA': 'e', '\u00EB': 'e',
+          '\u00E1': 'a', '\u00E0': 'a', '\u00E2': 'a', '\u00E4': 'a',
+          '\u00ED': 'i', '\u00EC': 'i', '\u00EE': 'i', '\u00EF': 'i',
+          '\u00F3': 'o', '\u00F2': 'o', '\u00F4': 'o', '\u00F6': 'o',
+          '\u00FA': 'u', '\u00F9': 'u', '\u00FB': 'u', '\u00FC': 'u',
+          '\u00F1': 'n', '\u00E7': 'c',
+          // Quotes
+          '\u2018': "'", '\u2019': "'", '\u201C': '"', '\u201D': '"',
+          // Dashes
+          '\u2013': '-', '\u2014': '-',
+          // Other common symbols
+          '\u2026': '...',
+        };
+        
+        return replacements[char] || '?';
+      }
+      return char;
+    })
+    // Remove any remaining high Unicode characters
+    .replace(/[^\x00-\xFF]/g, '?')
+    // Clean up multiple question marks
+    .replace(/\?+/g, '?');
+}
+
+// Sanitize objects recursively
+function sanitizeObject(obj: any): any {
+  if (typeof obj === 'string') {
+    return sanitizeForByteString(obj);
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeObject);
+  }
+  
+  if (obj && typeof obj === 'object') {
+    const sanitized: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      sanitized[key] = sanitizeObject(value);
+    }
+    return sanitized;
+  }
+  
+  return obj;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Try to check authentication, but allow access for free platform
@@ -23,7 +89,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing analysis data' }, { status: 400 });
     }
 
-    console.log('🎯 Generating comprehensive PDF report for:', company.name);
+    console.log('Generating comprehensive PDF report for:', sanitizeForByteString(company.name || 'Unknown Company'));
+
+    // Sanitize input data to prevent ByteString conversion errors
+    const sanitizedAnalysis = sanitizeObject(analysis);
+    const sanitizedCompany = sanitizeObject(company);
+    const sanitizedCompetitors = sanitizeObject(competitors);
 
     // Generate executive summary and insights using OpenAI
     const model = getProviderModel('openai');
@@ -32,25 +103,31 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate concise insights for each section
-    const sectionInsights = await generateSectionInsights(model, analysis, company, competitors);
+    const sectionInsights = await generateSectionInsights(model, sanitizedAnalysis, sanitizedCompany, sanitizedCompetitors);
+    const sanitizedSectionInsights = sanitizeObject(sectionInsights);
 
     // Process actual analysis data for display
-    const reportData = processReportData(analysis, company, competitors);
+    const reportData = processReportData(sanitizedAnalysis, sanitizedCompany, sanitizedCompetitors);
+    const sanitizedReportData = sanitizeObject(reportData);
 
     // Generate the HTML report
     const reportHtml = generateGeoAnalysisReport({
-      company,
-      competitors,
-      analysis,
-      sectionInsights,
-      reportData
+      company: sanitizedCompany,
+      competitors: sanitizedCompetitors,
+      analysis: sanitizedAnalysis,
+      sectionInsights: sanitizedSectionInsights,
+      reportData: sanitizedReportData
     });
 
-    return new NextResponse(reportHtml, {
+    // Final sanitization of the HTML output
+    const sanitizedReportHtml = sanitizeForByteString(reportHtml);
+
+    return new NextResponse(sanitizedReportHtml, {
       status: 200,
       headers: {
-        'Content-Type': 'text/html',
-        'Content-Disposition': `inline; filename="${company.name}-GEO-Analysis-Report.html"`,
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Disposition': `inline; filename="${sanitizeForByteString(sanitizedCompany.name || 'Company')}-GEO-Analysis-Report.html"`,
+        'Content-Encoding': 'identity',
       },
     });
 
