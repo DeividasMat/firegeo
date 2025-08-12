@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateText } from 'ai';
-import { getProviderModel } from '@/lib/provider-config';
+// import { getProviderModel } from '@/lib/provider-config';
 import { auth } from '@/lib/auth';
 
 // Function to sanitize only problematic characters while keeping emojis
@@ -100,15 +99,13 @@ export async function POST(request: NextRequest) {
     const sanitizedCompany = sanitizeObject(company);
     const sanitizedCompetitors = sanitizeObject(competitors);
 
-    // Generate executive summary and insights using OpenAI
-    const model = getProviderModel('openai');
-    if (!model) {
-      return NextResponse.json({ error: 'OpenAI not available for report generation' }, { status: 500 });
-    }
-
-    // Generate concise insights for each section
-    const sectionInsights = await generateSectionInsights(model, sanitizedAnalysis, sanitizedCompany, sanitizedCompetitors);
-    const sanitizedSectionInsights = sanitizeObject(sectionInsights);
+    // Skip AI-generated section insights entirely
+    const sanitizedSectionInsights = {
+      comparisonMatrix: '',
+      promptsResponses: '',
+      providerRankings: '',
+      visibilityScore: ''
+    };
 
     // Process actual analysis data for display
     const reportData = processReportData(sanitizedAnalysis, sanitizedCompany, sanitizedCompetitors);
@@ -144,66 +141,66 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function generateSectionInsights(model: any, analysis: any, company: any, competitors: any[]) {
-  const insights = {
-    comparisonMatrix: '',
-    promptsResponses: '',
-    providerRankings: '',
-    visibilityScore: ''
-  };
+// async function generateSectionInsights(model: any, analysis: any, company: any, competitors: any[]) {
+//   const insights = {
+//     comparisonMatrix: '',
+//     promptsResponses: '',
+//     providerRankings: '',
+//     visibilityScore: ''
+//   };
 
-  try {
-    // Comparison Matrix Analysis (3-4 sentences)
-    const matrixPrompt = `Analyze the comparison matrix results for ${company.name}. Based on visibility scores across different AI providers (OpenAI, Anthropic, Perplexity), write exactly 3-4 sentences covering: cross-provider performance patterns, strongest/weakest provider channels, and key competitive gaps. Be specific about scores and actionable.`;
+//   try {
+//     // Comparison Matrix Analysis (3-4 sentences)
+//     const matrixPrompt = `Analyze the comparison matrix results for ${company.name}. Based on visibility scores across different AI providers (OpenAI, Anthropic, Perplexity), write exactly 3-4 sentences covering: cross-provider performance patterns, strongest/weakest provider channels, and key competitive gaps. Be specific about scores and actionable.`;
 
-    const { text: matrixInsight } = await generateText({
-      model,
-      prompt: matrixPrompt,
-      temperature: 0.2,
-      maxTokens: 200,
-    });
+//     const { text: matrixInsight } = await generateText({
+//       model,
+//       prompt: matrixPrompt,
+//       temperature: 0.2,
+//       maxTokens: 200,
+//     });
 
-    // Prompts & Responses Analysis (3-4 sentences)
-    const promptsPrompt = `Analyze the prompts and responses data for ${company.name}. Based on ${analysis.responses?.length || 0} queries analyzed, write exactly 3-4 sentences covering: brand mention frequency, response quality patterns, and top-performing query types. Focus on concrete findings and opportunities.`;
+//     // Prompts & Responses Analysis (3-4 sentences)
+//     const promptsPrompt = `Analyze the prompts and responses data for ${company.name}. Based on ${analysis.responses?.length || 0} queries analyzed, write exactly 3-4 sentences covering: brand mention frequency, response quality patterns, and top-performing query types. Focus on concrete findings and opportunities.`;
 
-    const { text: promptsInsight } = await generateText({
-      model,
-      prompt: promptsPrompt,
-      temperature: 0.2,
-      maxTokens: 200,
-    });
+//     const { text: promptsInsight } = await generateText({
+//       model,
+//       prompt: promptsPrompt,
+//       temperature: 0.2,
+//       maxTokens: 200,
+//     });
 
-    // Provider Rankings Analysis (3-4 sentences)
-    const rankingsPrompt = `Analyze the provider rankings for ${company.name} versus competitors. Write exactly 3-4 sentences covering: average ranking position, best-performing providers, competitive positioning gaps, and ranking improvement opportunities. Be specific about positions and competitors.`;
+//     // Provider Rankings Analysis (3-4 sentences)
+//     const rankingsPrompt = `Analyze the provider rankings for ${company.name} versus competitors. Write exactly 3-4 sentences covering: average ranking position, best-performing providers, competitive positioning gaps, and ranking improvement opportunities. Be specific about positions and competitors.`;
 
-    const { text: rankingsInsight } = await generateText({
-      model,
-      prompt: rankingsPrompt,
-      temperature: 0.2,
-      maxTokens: 200,
-    });
+//     const { text: rankingsInsight } = await generateText({
+//       model,
+//       prompt: rankingsPrompt,
+//       temperature: 0.2,
+//       maxTokens: 200,
+//     });
 
-    // Visibility Score Analysis (3-4 sentences)
-    const visibilityPrompt = `Analyze the visibility score results for ${company.name}. Write exactly 3-4 sentences covering: overall visibility performance, competitive position versus top performers, score distribution patterns, and key improvement areas. Include specific percentages and actionable insights.`;
+//     // Visibility Score Analysis (3-4 sentences)
+//     const visibilityPrompt = `Analyze the visibility score results for ${company.name}. Write exactly 3-4 sentences covering: overall visibility performance, competitive position versus top performers, score distribution patterns, and key improvement areas. Include specific percentages and actionable insights.`;
 
-    const { text: visibilityInsight } = await generateText({
-      model,
-      prompt: visibilityPrompt,
-      temperature: 0.2,
-      maxTokens: 200,
-    });
+//     const { text: visibilityInsight } = await generateText({
+//       model,
+//       prompt: visibilityPrompt,
+//       temperature: 0.2,
+//       maxTokens: 200,
+//     });
 
-    insights.comparisonMatrix = matrixInsight.trim();
-    insights.promptsResponses = promptsInsight.trim();
-    insights.providerRankings = rankingsInsight.trim();
-    insights.visibilityScore = visibilityInsight.trim();
+//     insights.comparisonMatrix = matrixInsight.trim();
+//     insights.promptsResponses = promptsInsight.trim();
+//     insights.providerRankings = rankingsInsight.trim();
+//     insights.visibilityScore = visibilityInsight.trim();
 
-  } catch (error) {
-    console.error('Error generating section insights:', error);
-  }
+//   } catch (error) {
+//     console.error('Error generating section insights:', error);
+//   }
 
-  return insights;
-}
+//   return insights;
+// }
 
 function processReportData(analysis: any, company: any, competitors: any[]) {
   const responses = analysis.responses || [];
