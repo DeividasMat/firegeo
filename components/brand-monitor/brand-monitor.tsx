@@ -681,8 +681,23 @@ export function BrandMonitor({
                           </CardDescription>
                         </div>
                         <div className="text-right">
-                          <p className="text-2xl font-bold text-orange-600">{brandData.visibilityScore}%</p>
-                          <p className="text-xs text-gray-500 mt-1">Average Score</p>
+                          <p className="text-2xl font-bold text-orange-600">
+                            {(() => {
+                              // Calculate actual average across AI providers
+                              const brandComparison = analysis.providerComparison?.find(comp => comp.isOwn);
+                              if (brandComparison?.providers) {
+                                const providerScores = Object.values(brandComparison.providers)
+                                  .map((p: any) => p.visibilityScore || 0)
+                                  .filter(score => score > 0);
+                                const average = providerScores.length > 0 
+                                  ? Math.round(providerScores.reduce((sum, score) => sum + score, 0) / providerScores.length)
+                                  : brandData.visibilityScore;
+                                return `${average}%`;
+                              }
+                              return `${brandData.visibilityScore}%`;
+                            })()}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">Provider Average</p>
                         </div>
                       </div>
                     </CardHeader>
